@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "993474475969",
+    "firebase_url": "https://fair-5268e-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "fair-5268e",
+    "storage_bucket": "fair-5268e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:993474475969:android:347aa48d5e26a91055e140",
+        "android_client_info": {
+          "package_name": "com.example.dynamicmataufareapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB6RKftvpSALUP41UchVllKYsw_v3NPVCY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
