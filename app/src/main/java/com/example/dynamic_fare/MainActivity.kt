@@ -119,7 +119,7 @@ fun SignupScreen() {
 
 @Composable
 fun PaymentScreen() {
-    val mpesaService = MpesaService() // ✅ M-Pesa Service instance
+    val mpesaService = MpesaService() //M-Pesa Service instance
     var phoneNumber by remember { mutableStateOf(TextFieldValue("")) }
     var amount by remember { mutableStateOf(TextFieldValue("")) }
     var statusMessage by remember { mutableStateOf("") }

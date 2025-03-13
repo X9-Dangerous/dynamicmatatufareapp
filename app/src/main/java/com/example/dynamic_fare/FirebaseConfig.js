@@ -5,13 +5,13 @@ import { getDatabase } from "firebase/database";
 
 // Your Firebase configuration (from Firebase Console)
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyB6RKftvpSALUP41UchVllKYsw_v3NPVCY",
+  authDomain: "fair-5268e.firebaseapp.com",
+  databaseURL: "https://fair-5268e.firebaseio.com",
+  projectId: "fair-5268e",
+  storageBucket: "fair-5268e.appspot.com",
+  messagingSenderId: "993474475969",
+  appId: "1:993474475969:android:347aa48d5e26a91055e140"
 };
 
 // Initialize Firebase

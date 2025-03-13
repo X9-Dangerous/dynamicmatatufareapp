@@ -18,7 +18,7 @@ data class PaymentRequest(val phone: String, val amount: Int)
 
 // Retrofit Instance
 val retrofit = Retrofit.Builder()
-    .baseUrl("https://yourbackend.com") // 🔥 Replace with your backend URL
+    .baseUrl("https://yourbackend.com") //  Replace with my backend URL
     .addConverterFactory(GsonConverterFactory.create())
     .build()
 
