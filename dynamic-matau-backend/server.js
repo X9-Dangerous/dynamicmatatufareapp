@@ -1,18 +1,53 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-require("dotenv").config(); // Load environment variables
+const cors = require("cors");
+const admin = require("firebase-admin");
+require("dotenv").config();
+
+// Initialize Firebase Admin SDK
+const serviceAccount = require("./serviceAccountKey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://your-project-id.firebaseio.com" // Replace with your actual Firebase URL
+});
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
 app.use(bodyParser.json());
+app.use(cors());
 
-// Sample M-Pesa STK Push Route
-app.post("/stkpush", (req, res) => {
-    console.log("M-Pesa STK Push request received:", req.body);
-    res.json({ message: "M-Pesa request received!" });
+const db = admin.database();
+
+//M-Pesa STK Push Endpoint**
+app.post("/stkpush", async (req, res) => {
+  try {
+    const { matatu_id, user_id, amount, phone_number, mpesa_receipt } = req.body;
+    console.log("Received M-Pesa request:", req.body);
+
+    // Create a new transaction ID
+    const transactionId = db.ref("payments").push().key;
+
+    // Payment Data
+    const paymentData = {
+      matatu_id,
+      user_id,
+      amount,
+      phone_number,
+      status: "Pending",
+      timestamp: Date.now(),
+      payment_method: "M-Pesa",
+      mpesa_receipt
+    };
+
+    // Save to Firebase
+    await db.ref("payments").child(transactionId).set(paymentData);
+
+    res.json({ success: true, message: "Payment request received!", transactionId });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+// Start Server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

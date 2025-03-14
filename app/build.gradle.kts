@@ -41,8 +41,16 @@ android {
 }
 
 dependencies {
+
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("androidx.navigation:navigation-compose:2.8.9")
+    implementation("com.google.firebase:firebase-database-ktx:21.0.0")
+    implementation("com.google.zxing:core:3.4.1")
+    implementation("com.google.firebase:firebase-auth-ktx:23.2.0")
+    implementation("com.google.firebase:firebase-firestore-ktx:25.1.2")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0") // Required for JSON conversion
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
