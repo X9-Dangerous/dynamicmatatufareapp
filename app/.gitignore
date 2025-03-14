@@ -1,1 +1,4 @@
 /build
+/package-lock.json
+/google-services.json
+/package.json

@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+/package-lock.json
+/package.json
+/.dyanimic-matau-backend/firebaseServiceAccountKey.json
