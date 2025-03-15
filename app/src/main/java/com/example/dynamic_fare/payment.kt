@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -14,6 +15,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.annotations.PreviewApi
 
 
 @Composable
@@ -86,4 +88,9 @@ fun PaymentDetailRow(label: String, value: String) {
         Text(text = label, fontSize = 16.sp, color = Color.Black)
         Text(text = value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
     }
+}
+@Preview(showBackground = true)
+@Composable
+fun PaymentPagePreview(){
+    PaymentPage()
 }
