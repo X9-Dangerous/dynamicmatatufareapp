@@ -1,6 +1,7 @@
 package com.example.dynamic_fare
 
 
+
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.ComponentActivity
@@ -9,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-
+import okio.blackholeSink
 
 
 @Composable
@@ -47,7 +49,7 @@ fun LoginScreenContent() {
             color = Color.Gray
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(50.dp))
 
         var email by remember { mutableStateOf("") }
         OutlinedTextField(
@@ -57,7 +59,7 @@ fun LoginScreenContent() {
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(40.dp))
 
         var password by remember { mutableStateOf("") }
         OutlinedTextField(
@@ -68,7 +70,7 @@ fun LoginScreenContent() {
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(100.dp))
 
         Button(
             onClick = { },
@@ -78,19 +80,23 @@ fun LoginScreenContent() {
                 .fillMaxWidth()
                 .height(50.dp)
         ) {
-            Text(text = "SIGN IN", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(text = "LOG IN", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(40.dp))
 
-        Text(
-            text = "Sign in with Google",
-            fontSize = 16.sp,
-            color = Color.Black,
-            modifier = Modifier.clickable { }
-        )
+        Button(
+            onClick = { /* TODO: Handle Google Sign-In */ },
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Black), // Google's red color
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+        ) {
 
-        Spacer(modifier = Modifier.height(20.dp))
+            Text(text = "Sign in with Google", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.height(40.dp))
 
         Text(
             text = "Forgot password?",
@@ -113,4 +119,9 @@ fun LoginScreenContent() {
             )
         }
     }
+}
+@Preview(showBackground = true)
+@Composable
+fun LoginScreenContentPreview() {
+    LoginScreenContent()
 }

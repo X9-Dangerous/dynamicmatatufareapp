@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,18 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.example.dynamicmataufareapp.R
 
-class FooterActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            DynamicMatauFareAppTheme {
-                Surface(color = MaterialTheme.colorScheme.background) {
-                    FooterWithIcons()
-                }
-            }
-        }
-    }
-}
+
 
 @Composable
 fun FooterWithIcons() {
@@ -63,4 +53,9 @@ fun FooterWithIcons() {
             )
         }
     }
+}
+@Preview(showBackground = true)
+@Composable
+fun FooterWithIconsPreview() {
+    FooterWithIcons()
 }

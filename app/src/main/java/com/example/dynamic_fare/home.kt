@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -14,6 +15,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import com.example.dynamicmataufareapp.R
 
 
@@ -26,7 +29,9 @@ fun MatatuEstimateScreen() {
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .padding(16.dp)
+            .navigationBarsPadding(), // Ensures it is above system buttons
+//        horizontalArrangement = Arrangement.SpaceAround,
+//        verticalAlignment = Alignment.CenterVertically
     ) {
         // Back Button and Title
         Row(
@@ -59,7 +64,8 @@ fun MatatuEstimateScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(300.dp)
-                .background(Color.LightGray, RoundedCornerShape(8.dp)),
+                .background(Color.LightGray, RoundedCornerShape(8.dp))
+                .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(text = "Map Placeholder", color = Color.Black)
@@ -73,9 +79,17 @@ fun MatatuEstimateScreen() {
             value = searchText,
             onValueChange = { searchText = it },
             placeholder = { Text(text = "Where to?", color = Color.Gray) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth()
+                .padding(16.dp),
             shape = RoundedCornerShape(8.dp)
         )
+        FooterWithIcons()
     }
+
+}
+@Preview(showBackground = true)
+@Composable
+fun MatatuEstimateScreenPreview() {
+    MatatuEstimateScreen()
 }
 
