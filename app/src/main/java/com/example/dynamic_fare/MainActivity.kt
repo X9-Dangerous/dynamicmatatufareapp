@@ -1,19 +1,21 @@
 package com.example.dynamic_fare
 
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.navigation.compose.rememberNavController
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -24,17 +26,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.annotation.SuppressLint
+import androidx.compose.foundation.layout.Arrangement
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
@@ -45,55 +55,35 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            LoginScreenContent()
-                }
+            DynamicMatauFareAppTheme {
+                MainAppContent()
             }
         }
+    }
+}
 
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun LoginScreen() {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf("") }
-    val auth = FirebaseAuth.getInstance()
-
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Login", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Button(onClick = {
-            auth.signInWithEmailAndPassword(email, password)
-                .addOnCompleteListener { task ->
-                    message = if (task.isSuccessful) "Login Successful" else task.exception?.message ?: "Login Failed"
-                }
-        }, modifier = Modifier.fillMaxWidth()) {
-            Text("Login")
+fun MainAppContent() {
+    val navController = rememberNavController()
+    
+    NavHost(
+        navController = navController,
+        startDestination = "login",
+        modifier = Modifier.fillMaxSize()
+    ) {
+        composable("login") {
+            LoginScreenContent(navController = navController)
         }
-        Spacer(modifier = Modifier.height(10.dp))
-        Button(onClick = { /* Navigate to Signup */ }, modifier = Modifier.fillMaxWidth()) {
-            Text("Sign Up")
+        composable("home") {
+            MatatuEstimateScreen(navController = navController)
         }
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(text = message, style = MaterialTheme.typography.bodyLarge)
+        composable("profile") {
+            Box(modifier = Modifier.fillMaxSize()) {
+                ProfileScreen()
+                FooterWithIcons(navController = navController)
+            }
+        }
     }
 }
 
@@ -116,7 +106,9 @@ fun QRCodeScreen() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(16.dp)) {
         if (isOperator) {
             OutlinedTextField(
                 value = registrationNumber,
@@ -181,7 +173,9 @@ fun PaymentScreen() {
     var statusMessage by remember { mutableStateOf("") }
     val db = FirebaseFirestore.getInstance()
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(16.dp)) {
         Text("M-Pesa Payment", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(10.dp))
         OutlinedTextField(

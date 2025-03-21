@@ -1,7 +1,5 @@
 package com.example.dynamic_fare
 
-
-
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.ComponentActivity
@@ -20,11 +18,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import okio.blackholeSink
-
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 
 @Composable
-fun LoginScreenContent() {
+fun LoginScreenContent(navController: NavController) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -73,7 +71,13 @@ fun LoginScreenContent() {
         Spacer(modifier = Modifier.height(100.dp))
 
         Button(
-            onClick = { },
+            onClick = { 
+                // Navigate to the home screen when login button is clicked
+                navController.navigate("home") {
+                    // Clear the back stack so user can't go back to login screen
+                    popUpTo("login") { inclusive = true }
+                }
+            },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B51E0)),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier
@@ -86,8 +90,14 @@ fun LoginScreenContent() {
         Spacer(modifier = Modifier.height(40.dp))
 
         Button(
-            onClick = { /* TODO: Handle Google Sign-In */ },
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black), // Google's red color
+            onClick = { 
+                // Navigate to the home screen when Google sign-in button is clicked
+                navController.navigate("home") {
+                    // Clear the back stack so user can't go back to login screen
+                    popUpTo("login") { inclusive = true }
+                }
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Black), 
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -120,8 +130,9 @@ fun LoginScreenContent() {
         }
     }
 }
+
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenContentPreview() {
-    LoginScreenContent()
+    LoginScreenContent(rememberNavController())
 }

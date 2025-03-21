@@ -1,5 +1,7 @@
 package com.example.dynamic_fare
 
+import androidx.compose.ui.tooling.preview.Preview
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,7 +9,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -15,23 +16,24 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.dynamicmataufareapp.R
-
-
+import org.osmdroid.config.Configuration
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 
 @Composable
-fun MatatuEstimateScreen() {
+fun MatatuEstimateScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .navigationBarsPadding(), // Ensures it is above system buttons
-//        horizontalArrangement = Arrangement.SpaceAround,
-//        verticalAlignment = Alignment.CenterVertically
+            .navigationBarsPadding(),
     ) {
         // Back Button and Title
         Row(
@@ -68,7 +70,19 @@ fun MatatuEstimateScreen() {
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "Map Placeholder", color = Color.Black)
+            AndroidView(factory = { context: Context ->
+                MapView(context).apply {
+                    Configuration.getInstance().load(context, context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+                    controller.setZoom(15.0)
+                    val startPoint = GeoPoint(-1.286389, 36.817223) // Example coordinates for Nairobi, Kenya
+                    controller.setCenter(startPoint)
+                    val marker = Marker(this)
+                    marker.position = startPoint
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    marker.title = "Matatu Stop"
+                    overlays.add(marker)
+                }
+            }, modifier = Modifier.fillMaxSize())
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -79,17 +93,17 @@ fun MatatuEstimateScreen() {
             value = searchText,
             onValueChange = { searchText = it },
             placeholder = { Text(text = "Where to?", color = Color.Gray) },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
                 .padding(16.dp),
             shape = RoundedCornerShape(8.dp)
         )
-        FooterWithIcons()
+        FooterWithIcons(navController)
     }
-
 }
+
 @Preview(showBackground = true)
 @Composable
 fun MatatuEstimateScreenPreview() {
     MatatuEstimateScreen()
 }
-

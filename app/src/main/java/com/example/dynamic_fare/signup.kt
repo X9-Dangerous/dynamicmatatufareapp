@@ -117,7 +117,7 @@ fun SignUpScreen() {
                     checked = isMatatuUser,
                     onCheckedChange = { isMatatuUser = it }
                 )
-                Text(text = "Are you a matatu user?")
+                Text(text = "Are you a matatu client?")
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -125,7 +125,7 @@ fun SignUpScreen() {
                     checked = isMatatuClient,
                     onCheckedChange = { isMatatuClient = it }
                 )
-                Text(text = "Are you a matatu client?")
+                Text(text = "Are you a matatu operator?")
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
