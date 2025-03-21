@@ -1,8 +1,13 @@
 package com.example.dynamic_fare
 
+import android.app.Activity
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.ComponentActivity
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,16 +18,48 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.android.gms.auth.api.identity.BeginSignInRequest
+import com.google.android.gms.auth.api.identity.Identity
 
 @Composable
 fun LoginScreenContent(navController: NavController) {
+    val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val oneTapClient = Identity.getSignInClient(context)
+            val credential = oneTapClient.getSignInCredentialFromIntent(result.data)
+            val googleIdToken = credential.googleIdToken
+
+            if (googleIdToken != null) {
+                val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
+                auth.signInWithCredential(firebaseCredential)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            Log.d("GoogleAuth", "Sign-in successful!")
+                            navController.navigate("home") {
+                                popUpTo("login") { inclusive = true }
+                            }
+                        } else {
+                            Log.e("GoogleAuth", "Sign-in failed: ${task.exception?.message}")
+                        }
+                    }
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -69,14 +106,23 @@ fun LoginScreenContent(navController: NavController) {
         )
 
         Spacer(modifier = Modifier.height(100.dp))
+        val loginMessage = remember { mutableStateOf("") }
 
         Button(
-            onClick = { 
-                // Navigate to the home screen when login button is clicked
-                navController.navigate("home") {
-                    // Clear the back stack so user can't go back to login screen
-                    popUpTo("login") { inclusive = true }
-                }
+            onClick = {
+                auth.signInWithEmailAndPassword(email, password)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            Log.d("FirebaseAuth", "Login Successful")
+                            loginMessage.value = "Login Successful!"
+                            navController.navigate("home") {
+                                popUpTo("login") { inclusive = true }
+                            }
+                        } else {
+                            Log.e("FirebaseAuth", "Login Failed: ${task.exception?.message}")
+                            loginMessage.value = task.exception?.message ?: "Login Failed!"
+                        }
+                    }
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B51E0)),
             shape = RoundedCornerShape(8.dp),
@@ -84,48 +130,66 @@ fun LoginScreenContent(navController: NavController) {
                 .fillMaxWidth()
                 .height(50.dp)
         ) {
-            Text(text = "LOG IN", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "LOG IN",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         Spacer(modifier = Modifier.height(40.dp))
 
         Button(
-            onClick = { 
-                // Navigate to the home screen when Google sign-in button is clicked
-                navController.navigate("home") {
-                    // Clear the back stack so user can't go back to login screen
-                    popUpTo("login") { inclusive = true }
-                }
+            onClick = {
+                val signInRequest = BeginSignInRequest.builder()
+                    .setGoogleIdTokenRequestOptions(
+                        BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
+                            .setSupported(true)
+                            .setServerClientId("YOUR_WEB_CLIENT_ID")
+                            .setFilterByAuthorizedAccounts(false)
+                            .build()
+                    )
+                    .build()
+
+                val oneTapClient = Identity.getSignInClient(context)
+                oneTapClient.beginSignIn(signInRequest)
+                    .addOnSuccessListener { result ->
+                        launcher.launch(IntentSenderRequest.Builder(result.pendingIntent.intentSender).build())
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("GoogleAuth", "Google Sign-in failed: ${e.message}")
+                    }
             },
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black), 
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
         ) {
-
             Text(text = "Sign in with Google", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
+
         Spacer(modifier = Modifier.height(40.dp))
 
         Text(
             text = "Forgot password?",
             fontSize = 14.sp,
             color = Color.Blue,
-            modifier = Modifier.clickable { }
+            modifier = Modifier.clickable { /* TODO: Implement forgot password */ }
         )
 
         Spacer(modifier = Modifier.height(40.dp))
 
         Row {
             Text(text = "Don't have an account?", fontSize = 14.sp, color = Color.Black)
-            Spacer(modifier = Modifier.width(5.dp))
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = "Sign up",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Blue,
-                modifier = Modifier.clickable { }
+                modifier = Modifier.clickable { /* TODO: Implement sign up navigation */ }
             )
         }
     }
