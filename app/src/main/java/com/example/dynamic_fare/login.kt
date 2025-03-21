@@ -119,7 +119,7 @@ fun LoginScreenContent(navController: NavController) {
 
         Row {
             Text(text = "Don't have an account?", fontSize = 14.sp, color = Color.Black)
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = "Sign up",
                 fontSize = 14.sp,
