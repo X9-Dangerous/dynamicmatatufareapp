@@ -15,11 +15,11 @@ object Routes {
 }
 
 @Composable
-fun AppNavigation(navController: NavHostController) {
+fun AppNavigation(navController: NavHostController, signUpViewModel: SignUpViewModel) {
     NavHost(navController = navController, startDestination = "login") {
-        composable("login") { LoginScreenContent(navController) }
+        composable("login") { LoginScreen(navController) }
         composable("operatorHome") { DisplayInfoScreen() }
         composable("clientHome") { MatatuEstimateScreen() }
-        composable("signup") { SignUpScreen(navController) }
+        composable("signup") { SignUpScreen(navController, signUpViewModel) }
     }
 }
