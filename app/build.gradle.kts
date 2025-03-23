@@ -68,7 +68,7 @@ android {
 }
 
 dependencies {
-    implementation("androidx.credentials:credentials:1.5.0-alpha02")
+
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("androidx.navigation:navigation-compose:2.8.9")
     implementation("com.google.firebase:firebase-database-ktx:21.0.0")
