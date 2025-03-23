@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.dynamicmataufareapp.R
+import com.example.dynamic_fare.R
 
 class PriceEstimateActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
