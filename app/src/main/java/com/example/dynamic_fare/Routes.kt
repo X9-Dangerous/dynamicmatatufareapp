@@ -18,7 +18,7 @@ object Routes {
 fun AppNavigation(navController: NavHostController) {
     NavHost(navController = navController, startDestination = "login") {
         composable("login") { LoginScreenContent(navController) }
-        composable("operatorHome") { OperatorHomeScreen() }
+        composable("operatorHome") { HomeOperator() }
         composable("clientHome") { ClientHomeScreen() }
         // Add more routes as needed
     }
