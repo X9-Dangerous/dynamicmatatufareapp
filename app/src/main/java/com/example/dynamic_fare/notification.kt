@@ -1,75 +1,65 @@
 package com.example.dynamic_fare
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.navigation.compose.rememberNavController
 
-
-@OptIn(ExperimentalMaterial3Api::class) // Optional: Can be removed if TopAppBar is stable in your version
 @Composable
 fun NotificationsScreen(navController: NavController) {
-    val notifications = remember {
-        mutableStateListOf(
-            "Morning fares have increased by Ksh 10",
-            "Rainy weather detected, fares may rise",
-            "New feature: Track matatu locations in real-time",
-            "Your last trip cost Ksh 50"
-        )
-    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding() // Ensures content does not overlap with status bar
+            .navigationBarsPadding(), // Ensures content does not overlap with navigation buttons
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Header with Back Button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_arrow_back), // Your drawable icon
+                contentDescription = "Back",
+                tint = Color.Black,
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable { navController.popBackStack() }
+            )
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar( // Material3 version of TopAppBar
-                title = { Text("Notifications") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Text(
+                text = "Notifications",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
             )
         }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color.White)
-        ) {
-            items(notifications) { notification ->
-                NotificationItem(notification)
-            }
-        }
-    }
-}
 
-@Composable
-fun NotificationItem(notification: String) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.LightGray)
-    ) {
-        Text(
-            text = notification,
-            modifier = Modifier.padding(16.dp),
-            style = MaterialTheme.typography.bodyLarge
-        )
+        Spacer(modifier = Modifier.weight(1f))  // Empty Space
+
+        // Footer at Bottom
+        FooterWithIcons(navController)
     }
 }
 @Preview(showBackground = true)
 @Composable
-fun NotificationsScreenPreview() {
+fun NotificationsScreenPreview(){
     NotificationsScreen(navController = rememberNavController())
 }
