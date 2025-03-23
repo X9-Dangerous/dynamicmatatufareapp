@@ -1,10 +1,9 @@
-package com.example.dynamicmataufareapp
-
+package com.example.dynamic_fare
 
 import android.util.Base64
 import android.util.Log
-import com.example.dynamicmataufareapp.BuildConfig
-/* import com.google.firebase.BuildConfig */
+import com.example.dynamic_fare.BuildConfig
+/*import com.google.firebase.BuildConfig*/
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.ResponseBody
@@ -77,7 +76,7 @@ class MpesaService {
 
         client.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: IOException) {
-                Log.e("MpesaService", "Error getting token: ${'$'}{e.message}")
+                Log.e("MpesaService", "Error getting token: ${e.message}")
                 callback(null)
             }
 
@@ -120,12 +119,12 @@ class MpesaService {
                     if (response.isSuccessful) {
                         callback(true, "STK Push sent successfully!")
                     } else {
-                        callback(false, "Payment failed: ${'$'}{response.errorBody()?.string()}")
+                        callback(false, "Payment failed: ${response.errorBody()?.string()}")
                     }
                 }
 
                 override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
-                    callback(false, "Network error: ${'$'}{t.message}")
+                    callback(false, "Network error: ${t.message}")
                 }
             })
         }
