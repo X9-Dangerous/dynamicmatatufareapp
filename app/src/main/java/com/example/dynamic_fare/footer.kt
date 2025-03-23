@@ -18,7 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import com.example.dynamicmataufareapp.R
+import com.example.dynamic_fare.R
 import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 
 @Composable

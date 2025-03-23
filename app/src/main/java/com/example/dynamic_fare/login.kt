@@ -146,7 +146,7 @@ fun LoginScreenContent(navController: NavController) {
                     .setGoogleIdTokenRequestOptions(
                         BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
                             .setSupported(true)
-                            .setServerClientId("YOUR_WEB_CLIENT_ID")
+                            .setServerClientId("993474475969-3a9kscepn460n60m27qfbckfg37jr1i2.apps.googleusercontent.com")
                             .setFilterByAuthorizedAccounts(false)
                             .build()
                     )
