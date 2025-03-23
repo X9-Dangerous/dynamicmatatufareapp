@@ -1,13 +1,8 @@
 package com.example.dynamic_fare
 
-
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,22 +10,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-
-class SignUpActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            SignUpScreen()
-        }
-    }
-}
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
-fun SignUpScreen() {
+fun SignUpScreen(navController: NavController) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -50,7 +38,7 @@ fun SignUpScreen() {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Sign up buttons
+        // Sign up with Google Button
         Button(
             onClick = { /* TODO: Handle Google sign-up */ },
             colors = ButtonDefaults.buttonColors(containerColor = Color.White),
@@ -63,7 +51,6 @@ fun SignUpScreen() {
         }
 
         Spacer(modifier = Modifier.height(40.dp))
-
 
         // Input Fields
         var name by remember { mutableStateOf("") }
@@ -105,41 +92,29 @@ fun SignUpScreen() {
 
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = isDisabled,
-                    onCheckedChange = { isDisabled = it }
-                )
+                Checkbox(checked = isDisabled, onCheckedChange = { isDisabled = it })
                 Text(text = "I am a person with a disability.")
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = isMatatuUser,
-                    onCheckedChange = { isMatatuUser = it }
-                )
+                Checkbox(checked = isMatatuUser, onCheckedChange = { isMatatuUser = it })
                 Text(text = "Are you a matatu client?")
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = isMatatuClient,
-                    onCheckedChange = { isMatatuClient = it }
-                )
+                Checkbox(checked = isMatatuClient, onCheckedChange = { isMatatuClient = it })
                 Text(text = "Are you a matatu operator?")
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = termsAccepted,
-                    onCheckedChange = { termsAccepted = it }
-                )
+                Checkbox(checked = termsAccepted, onCheckedChange = { termsAccepted = it })
                 Text(text = "I agree to all the Terms, Privacy Policy and Fees.")
             }
         }
 
         Spacer(modifier = Modifier.height(30.dp))
 
-        // Continue Button
+        // Continue Button (registration logic to be implemented)
         Button(
             onClick = { /* TODO: Handle continue action */ },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B51E0)),
@@ -153,19 +128,24 @@ fun SignUpScreen() {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Login Link
+        // Login Link: Navigates back to login screen
         Text(
             text = "Have an account? Log in",
             fontSize = 16.sp,
             color = Color.Blue,
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
-                .clickable { /* TODO: Navigate to Login */ }
+                .clickable {
+                    navController.navigate("login") {
+                        popUpTo("signup") { inclusive = true }
+                    }
+                }
         )
     }
 }
+
 @Preview(showBackground = true)
 @Composable
 fun SignUpScreenPreview(){
-    SignUpScreen()
+    SignUpScreen(rememberNavController())
 }

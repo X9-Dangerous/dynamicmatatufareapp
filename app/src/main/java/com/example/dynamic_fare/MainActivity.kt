@@ -49,6 +49,11 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import com.journeyapps.barcodescanner.BarcodeEncoder
+import androidx.activity.compose.setContent
+import androidx.navigation.compose.rememberNavController
+
+
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +62,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             DynamicMatauFareAppTheme {
                 MainAppContent()
+                val navController = rememberNavController()
+                AppNavigation(navController)
             }
         }
     }

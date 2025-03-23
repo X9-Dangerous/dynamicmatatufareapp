@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.ComponentActivity
@@ -58,10 +59,14 @@ fun LoginScreenContent(navController: NavController) {
             "client" -> navController.navigate("clientHome") {
                 popUpTo("login") { inclusive = true }
             }
-            else -> Log.e("LoginScreen", "Undefined or null user role")
+            else -> {
+                Log.e("LoginScreen", "Undefined or null user role")
+                Toast.makeText(context, "Undefined or null user role", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
+    // Launcher for Google Sign-In
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
@@ -87,6 +92,7 @@ fun LoginScreenContent(navController: NavController) {
                             }
                         } else {
                             Log.e("GoogleAuth", "Sign-in failed: ${task.exception?.message}")
+                            Toast.makeText(context, "Google sign-in failed.", Toast.LENGTH_SHORT).show()
                         }
                     }
             }
@@ -143,6 +149,13 @@ fun LoginScreenContent(navController: NavController) {
 
         Button(
             onClick = {
+                Log.d("LoginScreen", "Login button clicked")
+                // Step 1: Validate input
+                if (email.isBlank() || password.isBlank()) {
+                    Toast.makeText(context, "Please enter both email and password.", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+                // Step 2: Try Firebase email/password sign-in
                 auth.signInWithEmailAndPassword(email, password)
                     .addOnCompleteListener { task ->
                         if (task.isSuccessful) {
@@ -160,6 +173,8 @@ fun LoginScreenContent(navController: NavController) {
                         } else {
                             Log.e("FirebaseAuth", "Login Failed: ${task.exception?.message}")
                             loginMessage.value = task.exception?.message ?: "Login Failed!"
+                            // Step 3: Show failure feedback to the user
+                            Toast.makeText(context, loginMessage.value, Toast.LENGTH_SHORT).show()
                         }
                     }
             },
@@ -198,6 +213,7 @@ fun LoginScreenContent(navController: NavController) {
                     }
                     .addOnFailureListener { e ->
                         Log.e("GoogleAuth", "Google Sign-in failed: ${e.message}")
+                        Toast.makeText(context, "Google Sign-in failed.", Toast.LENGTH_SHORT).show()
                     }
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
@@ -228,12 +244,17 @@ fun LoginScreenContent(navController: NavController) {
         Row {
             Text(text = "Don't have an account?", fontSize = 14.sp, color = Color.Black)
             Spacer(modifier = Modifier.width(4.dp))
+            // Navigate to the Sign Up page when clicked
             Text(
                 text = "Sign up",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Blue,
-                modifier = Modifier.clickable { /* TODO: Implement sign up navigation */ }
+                modifier = Modifier.clickable {
+                    navController.navigate("signup") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                }
             )
         }
     }
