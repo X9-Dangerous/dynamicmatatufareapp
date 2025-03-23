@@ -9,7 +9,7 @@ const serviceAccount = require("./serviceAccountKey.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://your-project-id.firebaseio.com" // Replace with your actual Firebase URL
+  databaseURL: "https://fair-5268e-default-rtdb.asia-southeast1.firebasedatabase.app/"
 });
 
 const app = express();

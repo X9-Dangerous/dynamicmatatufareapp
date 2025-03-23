@@ -1,6 +1,7 @@
 package com.example.dynamic_fare
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.compose.setContent
@@ -13,7 +14,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,12 +21,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.database.FirebaseDatabase
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.Identity
 
@@ -34,6 +36,31 @@ import com.google.android.gms.auth.api.identity.Identity
 fun LoginScreenContent(navController: NavController) {
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
+    // Initialize the Firebase Realtime Database reference for users
+    val database = FirebaseDatabase.getInstance().getReference("users")
+
+    // Function to fetch user role from Firebase
+    fun fetchUserRole(uid: String, onResult: (String?) -> Unit) {
+        database.child(uid).child("role").get().addOnSuccessListener { snapshot ->
+            onResult(snapshot.getValue(String::class.java))
+        }.addOnFailureListener { exception ->
+            Log.e("FirebaseDB", "Error fetching user role: ${exception.message}")
+            onResult(null)
+        }
+    }
+
+    // Function to decide navigation based on role
+    fun navigateByRole(role: String?) {
+        when (role) {
+            "operator" -> navController.navigate("operatorHome") {
+                popUpTo("login") { inclusive = true }
+            }
+            "client" -> navController.navigate("clientHome") {
+                popUpTo("login") { inclusive = true }
+            }
+            else -> Log.e("LoginScreen", "Undefined or null user role")
+        }
+    }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -49,8 +76,14 @@ fun LoginScreenContent(navController: NavController) {
                     .addOnCompleteListener { task ->
                         if (task.isSuccessful) {
                             Log.d("GoogleAuth", "Sign-in successful!")
-                            navController.navigate("home") {
-                                popUpTo("login") { inclusive = true }
+                            // After successful Google sign-in, fetch the user's role
+                            val uid = auth.currentUser?.uid
+                            if (uid != null) {
+                                fetchUserRole(uid) { role ->
+                                    navigateByRole(role)
+                                }
+                            } else {
+                                Log.e("GoogleAuth", "UID is null after sign-in")
                             }
                         } else {
                             Log.e("GoogleAuth", "Sign-in failed: ${task.exception?.message}")
@@ -115,8 +148,14 @@ fun LoginScreenContent(navController: NavController) {
                         if (task.isSuccessful) {
                             Log.d("FirebaseAuth", "Login Successful")
                             loginMessage.value = "Login Successful!"
-                            navController.navigate("home") {
-                                popUpTo("login") { inclusive = true }
+                            val uid = auth.currentUser?.uid
+                            if (uid != null) {
+                                // Fetch user role from the database after login
+                                fetchUserRole(uid) { role ->
+                                    navigateByRole(role)
+                                }
+                            } else {
+                                Log.e("FirebaseAuth", "UID is null after login")
                             }
                         } else {
                             Log.e("FirebaseAuth", "Login Failed: ${task.exception?.message}")
@@ -167,7 +206,12 @@ fun LoginScreenContent(navController: NavController) {
                 .fillMaxWidth()
                 .height(50.dp)
         ) {
-            Text(text = "Sign in with Google", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "Sign in with Google",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         Spacer(modifier = Modifier.height(40.dp))
