@@ -27,10 +27,12 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
 
                 NavHost(navController = navController, startDestination = "login") {
-                    composable("login") { LoginScreen(navController) }
-                    composable("signup") { SignUpScreen(navController, signUpViewModel) }
-                    composable("home") { MatatuEstimateScreen(navController) }
-                    composable("profile") { ProfileScreen() }
+                    composable(Routes.LoginScreenContent) { LoginScreenContent(navController) }
+                    composable(Routes.SignUpScreen) { SignUpScreen(navController, signUpViewModel) }
+                    composable(Routes.OperatorHome) { DisplayInfoScreen(navController) }
+                    composable(Routes.MatatuEstimateScreen) { MatatuEstimateScreen(navController) }
+                    composable(Routes.PasswordRecoveryScreen) { PasswordRecoveryScreen(navController) }
+                    composable(Routes.FooterWithIcons) { ProfileScreen() }
                 }
             }
         }

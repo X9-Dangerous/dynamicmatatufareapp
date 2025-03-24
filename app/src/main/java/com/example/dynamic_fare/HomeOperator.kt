@@ -16,12 +16,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController // ✅ Added missing import
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 
 @Composable
-fun DisplayInfoScreen() {
+fun DisplayInfoScreen(navController: NavController) {
     var regNumber by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
     val qrBitmap by remember(regNumber) { mutableStateOf(generateQRCodeBitmap(regNumber)) }
@@ -116,7 +117,7 @@ fun generateQRCodeBitmap(content: String): Bitmap? {
 @Preview(showBackground = true)
 @Composable
 fun PreviewDisplayInfoScreen() {
-    DisplayInfoScreen()
+
+    val navController = androidx.navigation.compose.rememberNavController()
+    DisplayInfoScreen(navController)
 }
-
-

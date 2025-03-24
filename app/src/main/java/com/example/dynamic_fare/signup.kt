@@ -43,7 +43,8 @@ fun SignUpScreen(navController: NavController, viewModel: SignUpViewModel) {
                 OutlinedTextField(
                     value = uiState.name,
                     onValueChange = { uiState.name = it },
-                    label = { Text("First Name") },
+                    label = { Text("First Name", color=Color.Black) },
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -52,7 +53,8 @@ fun SignUpScreen(navController: NavController, viewModel: SignUpViewModel) {
                 OutlinedTextField(
                     value = uiState.surname,
                     onValueChange = { uiState.surname = it },
-                    label = { Text("Surname") },
+                    label = { Text("Surname",color=Color.Black) },
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -61,7 +63,8 @@ fun SignUpScreen(navController: NavController, viewModel: SignUpViewModel) {
                 OutlinedTextField(
                     value = uiState.phone,
                     onValueChange = { uiState.phone = it },
-                    label = { Text("Phone Number") },
+                    label = { Text("Phone Number",color=Color.Black) },
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -71,7 +74,8 @@ fun SignUpScreen(navController: NavController, viewModel: SignUpViewModel) {
                 OutlinedTextField(
                     value = uiState.email,
                     onValueChange = { uiState.email = it },
-                    label = { Text("Email Address") },
+                    label = { Text("Email Address",color=Color.Black) },
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -80,7 +84,8 @@ fun SignUpScreen(navController: NavController, viewModel: SignUpViewModel) {
                 OutlinedTextField(
                     value = uiState.password,
                     onValueChange = { uiState.password = it },
-                    label = { Text("Password") },  // ✅ Added Label
+                    label = { Text("Password", color=Color.Black) },
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -90,7 +95,8 @@ fun SignUpScreen(navController: NavController, viewModel: SignUpViewModel) {
                 OutlinedTextField(
                     value = uiState.confirmPassword,
                     onValueChange = { uiState.confirmPassword = it },
-                    label = { Text("Confirm Password") },  // ✅ Added Label
+                    label = { Text("Confirm Password", color=Color.Black) },
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -176,5 +182,4 @@ fun SignUpScreen(navController: NavController, viewModel: SignUpViewModel) {
                 )
             }
         }
-    }
-}
+    }}
