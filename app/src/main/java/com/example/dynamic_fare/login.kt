@@ -1,13 +1,8 @@
 package com.example.dynamic_fare
 
 import android.app.Activity
-import android.content.Intent
-import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
-import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.ComponentActivity
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -20,81 +15,40 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.database.FirebaseDatabase
-import com.google.android.gms.auth.api.identity.BeginSignInRequest
-import com.google.android.gms.auth.api.identity.Identity
+import com.example.dynamic_fare.auth.*
 
 @Composable
 fun LoginScreenContent(navController: NavController) {
     val context = LocalContext.current
-    val auth = FirebaseAuth.getInstance()
-    // Initialize the Firebase Realtime Database reference for users
-    val database = FirebaseDatabase.getInstance().getReference("users")
+    val authRepository = AuthRepository(context)
+    val userRepository = UserRepository()
+    val authViewModel: AuthViewModel = viewModel(
+        factory = AuthViewModelFactory(authRepository, userRepository)
+    )
 
-    // Function to fetch user role from Firebase
-    fun fetchUserRole(uid: String, onResult: (String?) -> Unit) {
-        database.child(uid).child("role").get().addOnSuccessListener { snapshot ->
-            onResult(snapshot.getValue(String::class.java))
-        }.addOnFailureListener { exception ->
-            Log.e("FirebaseDB", "Error fetching user role: ${exception.message}")
-            onResult(null)
-        }
-    }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Function to decide navigation based on role
-    fun navigateByRole(role: String?) {
-        when (role) {
-            "operator" -> navController.navigate("operatorHome") {
-                popUpTo("login") { inclusive = true }
-            }
-            "client" -> navController.navigate("clientHome") {
-                popUpTo("login") { inclusive = true }
-            }
-            else -> {
-                Log.e("LoginScreen", "Undefined or null user role")
-                Toast.makeText(context, "Undefined or null user role", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    // Launcher for Google Sign-In
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            val oneTapClient = Identity.getSignInClient(context)
+            val oneTapClient = com.google.android.gms.auth.api.identity.Identity.getSignInClient(context)
             val credential = oneTapClient.getSignInCredentialFromIntent(result.data)
             val googleIdToken = credential.googleIdToken
 
             if (googleIdToken != null) {
-                val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                auth.signInWithCredential(firebaseCredential)
-                    .addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            Log.d("GoogleAuth", "Sign-in successful!")
-                            // After successful Google sign-in, fetch the user's role
-                            val uid = auth.currentUser?.uid
-                            if (uid != null) {
-                                fetchUserRole(uid) { role ->
-                                    navigateByRole(role)
-                                }
-                            } else {
-                                Log.e("GoogleAuth", "UID is null after sign-in")
-                            }
-                        } else {
-                            Log.e("GoogleAuth", "Sign-in failed: ${task.exception?.message}")
-                            Toast.makeText(context, "Google sign-in failed.", Toast.LENGTH_SHORT).show()
-                        }
-                    }
+                authViewModel.googleSignIn(googleIdToken) { role ->
+                    navigateByRole(navController, role)
+                }
             }
         }
     }
@@ -106,8 +60,6 @@ fun LoginScreenContent(navController: NavController) {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(40.dp))
-
         Text(
             text = "Welcome Back!",
             fontSize = 24.sp,
@@ -123,128 +75,99 @@ fun LoginScreenContent(navController: NavController) {
             color = Color.Gray
         )
 
-        Spacer(modifier = Modifier.height(50.dp))
+        Spacer(modifier = Modifier.height(40.dp))
 
-        var email by remember { mutableStateOf("") }
+        // 🔹 Email Field
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            placeholder = { Text("Enter your email") },
+            placeholder = { Text("Enter your email", color = Color.Black) },
+            textStyle = TextStyle(color = Color.Black),
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        var password by remember { mutableStateOf("") }
+        // 🔹 Password Field
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            placeholder = { Text("Enter your password") },
+            placeholder = { Text("Enter your password", color = Color.Black) },
+            textStyle = TextStyle(color = Color.Black),
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(100.dp))
-        val loginMessage = remember { mutableStateOf("") }
+        Spacer(modifier = Modifier.height(40.dp))
 
+        // 🔹 Login Button with Error Handling
         Button(
             onClick = {
-                Log.d("LoginScreen", "Login button clicked")
-                // Step 1: Validate input
-                if (email.isBlank() || password.isBlank()) {
-                    Toast.makeText(context, "Please enter both email and password.", Toast.LENGTH_SHORT).show()
-                    return@Button
-                }
-                // Step 2: Try Firebase email/password sign-in
-                auth.signInWithEmailAndPassword(email, password)
-                    .addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            Log.d("FirebaseAuth", "Login Successful")
-                            loginMessage.value = "Login Successful!"
-                            val uid = auth.currentUser?.uid
-                            if (uid != null) {
-                                // Fetch user role from the database after login
-                                fetchUserRole(uid) { role ->
-                                    navigateByRole(role)
-                                }
-                            } else {
-                                Log.e("FirebaseAuth", "UID is null after login")
-                            }
-                        } else {
-                            Log.e("FirebaseAuth", "Login Failed: ${task.exception?.message}")
-                            loginMessage.value = task.exception?.message ?: "Login Failed!"
-                            // Step 3: Show failure feedback to the user
-                            Toast.makeText(context, loginMessage.value, Toast.LENGTH_SHORT).show()
-                        }
+                authViewModel.loginUser(email, password) { result ->
+                    if (result == "Matatu Operator" || result == "Matatu Client") {
+                        navigateByRole(navController, result)
+                    } else {
+                        errorMessage = result // Show error message
                     }
+                }
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B51E0)),
             shape = RoundedCornerShape(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
+            modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
+            Text("LOG IN", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+
+        // 🔹 Show Error Message if Exists
+        if (errorMessage != null) {
             Text(
-                text = "LOG IN",
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+                errorMessage!!,
+                color = Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
+        // 🔹 Google Sign-In Button
         Button(
             onClick = {
-                val signInRequest = BeginSignInRequest.builder()
-                    .setGoogleIdTokenRequestOptions(
-                        BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
-                            .setSupported(true)
-                            .setServerClientId("993474475969-3a9kscepn460n60m27qfbckfg37jr1i2.apps.googleusercontent.com")
-                            .setFilterByAuthorizedAccounts(false)
-                            .build()
-                    )
-                    .build()
-
-                val oneTapClient = Identity.getSignInClient(context)
+                val signInRequest = authRepository.googleSignInRequest()
+                val oneTapClient = com.google.android.gms.auth.api.identity.Identity.getSignInClient(context)
                 oneTapClient.beginSignIn(signInRequest)
                     .addOnSuccessListener { result ->
                         launcher.launch(IntentSenderRequest.Builder(result.pendingIntent.intentSender).build())
                     }
                     .addOnFailureListener { e ->
-                        Log.e("GoogleAuth", "Google Sign-in failed: ${e.message}")
-                        Toast.makeText(context, "Google Sign-in failed.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Google Sign-in failed: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
             shape = RoundedCornerShape(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
+            modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
-            Text(
-                text = "Sign in with Google",
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Sign in with Google", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
+        // 🔹 Forgot Password
         Text(
             text = "Forgot password?",
             fontSize = 14.sp,
             color = Color.Blue,
-            modifier = Modifier.clickable { /* TODO: Implement forgot password */ }
+            modifier = Modifier.clickable {
+                navController.navigate(Routes.PasswordRecoveryScreen)
+            }
         )
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
+        // 🔹 Sign-up Navigation
         Row {
             Text(text = "Don't have an account?", fontSize = 14.sp, color = Color.Black)
             Spacer(modifier = Modifier.width(4.dp))
-            // Navigate to the Sign Up page when clicked
             Text(
                 text = "Sign up",
                 fontSize = 14.sp,
@@ -260,8 +183,17 @@ fun LoginScreenContent(navController: NavController) {
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun LoginScreenContentPreview() {
-    LoginScreenContent(rememberNavController())
+fun navigateByRole(navController: NavController, role: String?) {
+    when (role) {
+        "Matatu Operator" -> {
+            navController.navigate(Routes.OperatorHome) { popUpTo(Routes.LoginScreenContent) { inclusive = true } }
+        }
+        "Matatu Client" -> {
+            navController.navigate(Routes.MatatuEstimateScreen) { popUpTo(Routes.LoginScreenContent) { inclusive = true } }
+        }
+        else -> {
+            Toast.makeText(navController.context, "Redirecting to homepage", Toast.LENGTH_SHORT).show()
+            navController.navigate(Routes.LoginScreenContent) { popUpTo(Routes.LoginScreenContent) { inclusive = true } }
+        }
+    }
 }
