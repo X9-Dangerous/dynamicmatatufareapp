@@ -1,7 +1,5 @@
 package com.example.dynamic_fare
 
-
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,16 +10,22 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.dynamic_fare.R
-
+import androidx.navigation.compose.rememberNavController
 
 @Composable
-fun RouteSelectionScreen() {
+fun RouteSelectionScreen(navController: NavController = rememberNavController()) {
+    val context = LocalContext.current
+    
+    // State for the input fields
+    var startingPoint by remember { mutableStateOf("") }
+    var destination by remember { mutableStateOf("") }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -40,7 +44,13 @@ fun RouteSelectionScreen() {
                 tint = Color.Black,
                 modifier = Modifier
                     .size(32.dp)
-                    .clickable { /* Handle back action */ }
+                    .clickable { 
+                        try {
+                            navController.popBackStack()
+                        } catch (e: Exception) {
+                            println("Navigation error: ${e.message}")
+                        }
+                    }
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -57,37 +67,56 @@ fun RouteSelectionScreen() {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Starting Point Input
-        RouteInputField(label = "Starting point")
+        // Starting Point Input - now interactive
+        RouteInputField(
+            label = "Starting point",
+            value = startingPoint,
+            onValueChange = { startingPoint = it }
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Destination Input
-        RouteInputField(label = "Destination")
+        // Destination Input - now interactive
+        RouteInputField(
+            label = "Destination",
+            value = destination,
+            onValueChange = { destination = it }
+        )
     }
 }
 
 @Composable
-fun RouteInputField(label: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+fun RouteInputField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text(text = label) },
+        leadingIcon = {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_search_button),
+                contentDescription = "Search",
+                modifier = Modifier.size(24.dp)
+            )
+        },
         modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.LightGray, RoundedCornerShape(8.dp))
-            .padding(12.dp)
-    ) {
-        Icon(
-            painter = painterResource(id = R.drawable.ic_search_button),
-            contentDescription = "Search",
-            modifier = Modifier.size(24.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            disabledContainerColor = Color.White,
+            focusedIndicatorColor = Color(0xFF2196F3),
+            unfocusedIndicatorColor = Color.Gray
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = label, color = Color.Black)
-    }
+    )
 }
+
 @Preview(showBackground = true)
 @Composable
 fun RouteSelectionScreenPreview() {
     RouteSelectionScreen()
 }
-

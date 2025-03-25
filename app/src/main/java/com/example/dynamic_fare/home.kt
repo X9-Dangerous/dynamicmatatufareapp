@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavOptions
 import com.example.dynamic_fare.R
 import org.osmdroid.config.Configuration
 import org.osmdroid.util.GeoPoint
@@ -87,17 +88,47 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Search Bar
-        var searchText by remember { mutableStateOf("") }
-        OutlinedTextField(
-            value = searchText,
-            onValueChange = { searchText = it },
-            placeholder = { Text(text = "Where to?", color = Color.Gray) },
+        // "Where to" button with proper navigation options
+        OutlinedCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(8.dp)
-        )
+                .padding(16.dp)
+                .clickable {
+                    try {
+                        // Using the navigation pattern consistent with the app
+                        val navOptions = NavOptions.Builder()
+                            .setPopUpTo(Routes.MatatuEstimateScreen, false)
+                            .setLaunchSingleTop(true)
+                            .build()
+                        
+                        navController.navigate(Routes.RouteSelectionScreen, navOptions)
+                    } catch (e: Exception) {
+                        println("Navigation error: ${e.message}")
+                    }
+                },
+            shape = RoundedCornerShape(8.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_search_button),
+                    contentDescription = "Search",
+                    tint = Color.Gray
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Where to?",
+                    color = Color.Gray,
+                    fontSize = 16.sp
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
         FooterWithIcons(navController)
     }
 }
