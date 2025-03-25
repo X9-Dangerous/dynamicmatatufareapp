@@ -1,5 +1,3 @@
-package com.example.dynamic_fare
-
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DatabaseReference
 import kotlinx.coroutines.Dispatchers
@@ -36,13 +34,25 @@ object AuthManager {
                 val result = auth.createUserWithEmailAndPassword(email, password).await()
                 val user = result.user
                 user?.let {
-                    val userData = mapOf(
+                    val userData = mutableMapOf(
                         "name" to name,
                         "surname" to surname,
                         "phone" to phone,
                         "email" to email,
                         "role" to selectedRole
                     )
+
+                    // If the user is a Matatu Operator, generate an operatorId
+                    if (selectedRole == "Matatu Operator") {
+                        val operatorId = db.child("operators").push().key // Generate unique ID
+
+                        // Ensure operatorId is not null before using it
+                        if (!operatorId.isNullOrEmpty()) {
+                            userData["operatorId"] = operatorId
+                            db.child("operators").child(operatorId).setValue(mapOf("userId" to it.uid))
+                        }
+                    }
+
                     db.child("users").child(it.uid).setValue(userData).await()
                 }
                 true
