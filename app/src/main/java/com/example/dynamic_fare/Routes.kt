@@ -24,6 +24,5 @@ fun AppNavigation(navController: NavHostController, signUpViewModel: SignUpViewM
         composable(Routes.MatatuEstimateScreen) { MatatuEstimateScreen(navController) }
         composable(Routes.SignUpScreen) { SignUpScreen(navController, signUpViewModel) }
         composable(Routes.PasswordRecoveryScreen) { PasswordRecoveryScreen(navController) }
-        composable(Routes.RouteSelectionScreen) { RouteSelectionScreen(navController) }
     }
 }

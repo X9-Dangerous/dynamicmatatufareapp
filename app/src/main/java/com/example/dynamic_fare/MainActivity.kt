@@ -48,7 +48,6 @@ class MainActivity : ComponentActivity() {
                     composable(Routes.MatatuEstimateScreen) { MatatuEstimateScreen(navController) }
                     composable(Routes.PasswordRecoveryScreen) { PasswordRecoveryScreen(navController) }
                     composable(Routes.FooterWithIcons) { ProfileScreen() }
-                    composable(Routes.RouteSelectionScreen) { RouteSelectionScreen(navController) }
                 }
             }
         }
