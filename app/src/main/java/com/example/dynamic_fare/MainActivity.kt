@@ -15,6 +15,9 @@ import com.example.dynamic_fare.Routes.MatatuRegistrationScreen
 import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.example.dynamic_fare.ui.screens.*
 import com.example.dynamic_fare.ui.ChooseFleetDialog
+import com.example.dynamic_fare.ui.FleetRegistrationScreen
+import com.example.dynamic_fare.ui.MatatuInfoScreen
+import com.example.dynamic_fare.ui.MatatuRegistrationScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 
