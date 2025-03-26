@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.dynamic_fare.auth.*
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 
 @Composable
 fun LoginScreenContent(navController: NavController) {
@@ -184,16 +186,32 @@ fun LoginScreenContent(navController: NavController) {
 }
 
 fun navigateByRole(navController: NavController, role: String?) {
-    when (role) {
-        "Matatu Operator" -> {
-            navController.navigate(Routes.OperatorHome) { popUpTo(Routes.LoginScreenContent) { inclusive = true } }
+    val auth = FirebaseAuth.getInstance()
+    val userId = auth.currentUser?.uid
+
+    if (role == "Matatu Operator" && userId != null) {
+        val db = FirebaseDatabase.getInstance().reference.child("users").child(userId).child("operatorId")
+
+        db.get().addOnSuccessListener { snapshot ->
+            val operatorId = snapshot.value as? String
+            if (!operatorId.isNullOrEmpty()) {
+                navController.navigate("operatorHome/$operatorId")
+                {
+                    popUpTo(Routes.LoginScreenContent) { inclusive = true }
+                }
+            } else {
+                Toast.makeText(navController.context, "Operator ID not found!", Toast.LENGTH_SHORT).show()
+            }
         }
-        "Matatu Client" -> {
-            navController.navigate(Routes.MatatuEstimateScreen) { popUpTo(Routes.LoginScreenContent) { inclusive = true } }
+    } else if (role == "Matatu Client") {
+        navController.navigate(Routes.MatatuEstimateScreen) {
+            popUpTo(Routes.LoginScreenContent) { inclusive = true }
         }
-        else -> {
-            Toast.makeText(navController.context, "Redirecting to homepage", Toast.LENGTH_SHORT).show()
-            navController.navigate(Routes.LoginScreenContent) { popUpTo(Routes.LoginScreenContent) { inclusive = true } }
+    } else {
+        Toast.makeText(navController.context, "Redirecting to homepage", Toast.LENGTH_SHORT).show()
+        navController.navigate(Routes.LoginScreenContent) {
+            popUpTo(Routes.LoginScreenContent) { inclusive = true }
         }
     }
 }
+

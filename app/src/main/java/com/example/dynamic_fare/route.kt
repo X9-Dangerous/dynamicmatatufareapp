@@ -90,4 +90,3 @@ fun RouteInputField(label: String) {
 fun RouteSelectionScreenPreview() {
     RouteSelectionScreen()
 }
-
