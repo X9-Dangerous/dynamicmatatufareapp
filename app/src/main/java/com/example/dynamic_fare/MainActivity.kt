@@ -9,9 +9,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.dynamic_fare.Routes.MatatuInfoScreen
+import com.example.dynamic_fare.ui.MatatuRegistrationScreen
+import com.example.dynamic_fare.ui.ChooseFleetDialog
+import com.example.dynamic_fare.ui.FleetRegistrationScreen
 import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.example.dynamic_fare.ui.MatatuInfoScreen
+import com.example.dynamic_fare.ui.screens.OperatorHomeScreen
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,7 +29,7 @@ class MainActivity : ComponentActivity() {
         val auth = FirebaseAuth.getInstance()
         val db = FirebaseDatabase.getInstance().reference
 
-        // Properly handle database initialization with robust error handling
+       /* // Properly handle database initialization with robust error handling
         try {
             Log.d("MainActivity", "Initializing database")
             val database = AppDatabase.getDatabase(this)
@@ -35,7 +42,7 @@ class MainActivity : ComponentActivity() {
             // Log error but don't crash the app
             Log.e("MainActivity", "Error initializing database: ${e.message}", e)
         }
-
+*/
         // Initialize ViewModel for Sign Up
         val signUpViewModel = ViewModelProvider(this, SignUpViewModelFactory(auth, db))
             .get(SignUpViewModel::class.java)
@@ -55,13 +62,47 @@ class MainActivity : ComponentActivity() {
                     // 🟢 Operator Home Screen - Takes `operatorId` as argument
                     composable(Routes.OperatorHome) { backStackEntry ->
                         val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
-                        DisplayInfoScreen(navController, operatorId)
+                        OperatorHomeScreen(navController, operatorId)
                     }
 
                     // 🟢 Registration Screen - Takes `operatorId` as argument
                     composable(Routes.RegistrationScreen) { backStackEntry ->
                         val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
                         RegistrationScreen(navController, operatorId)
+                    }
+
+                    // 🟢 Choose Fleet or Single Matatu (Popup when `+` is clicked)
+                    composable(Routes.ChooseFleetDialog) { backStackEntry ->
+                        val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
+                        ChooseFleetDialog(
+                            onDismiss = { navController.popBackStack() },
+                            onSelection = { isFleet ->
+                                val route = if (isFleet) {
+                                    "fleetRegistration/$operatorId"
+                                } else {
+                                    "matatuRegistration/$operatorId"
+                                }
+                                navController.navigate(route)
+                            }
+                        )
+                    }
+
+                    // 🟢 Fleet Registration
+                    composable(Routes.FleetRegistrationScreen) { backStackEntry ->
+                        val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
+                        FleetRegistrationScreen(navController, operatorId)
+                    }
+
+                    // 🟢 Matatu Registration
+                    composable(Routes.MatatuRegistrationScreen) { backStackEntry ->
+                        val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
+                        MatatuRegistrationScreen(navController, operatorId)
+                    }
+
+                    // 🟢 Matatu Info Page (if exists)
+                    composable(Routes.MatatuInfoScreen) { backStackEntry ->
+                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
+                        MatatuInfoScreen(navController, matatuId)
                     }
                 }
             }
