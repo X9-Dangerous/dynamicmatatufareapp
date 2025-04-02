@@ -1,59 +1,115 @@
 package com.example.dynamic_fare.data
 
-import android.graphics.Bitmap
-import com.example.dynamic_fare.utils.QRCodeGenerator
+import android.util.Log
+import com.example.dynamic_fare.models.Matatu
 import com.google.firebase.database.*
-import java.util.UUID
 
 object MatatuRepository {
+    private val database: DatabaseReference = FirebaseDatabase.getInstance().reference.child("matatus")
 
-    private val database: DatabaseReference = FirebaseDatabase.getInstance().getReference("matatus")
-
-    fun fetchMatatuData(operatorId: String, onResult: (String, String, String) -> Unit) {
-        database.child(operatorId).get().addOnSuccessListener { snapshot ->
-            val regNumber = snapshot.child("regNumber").getValue(String::class.java) ?: ""
-            val route = snapshot.child("route").getValue(String::class.java) ?: ""
-            val uniqueCode = snapshot.child("uniqueCode").getValue(String::class.java) ?: ""
-
-            onResult(regNumber, route, uniqueCode)
-        }.addOnFailureListener {
-            onResult("", "", "")
-        }
+    fun isValidKenyanPlate(plate: String): Boolean {
+        val regex = "^[Kk][A-Z]{2} [0-9]{3}[A-Z]$".toRegex()
+        return regex.matches(plate)
     }
 
-    fun fetchMatatusForOperator(operatorId: String, onResult: (List<String>) -> Unit) {
-        database.orderByChild("operatorId").equalTo(operatorId)
+    // ✅ Register a new matatu (without storing QR Code)
+    fun registerMatatu(
+        matatuId: String,
+        operatorId: String,
+        regNumber: String,
+        routeStart: String,
+        routeEnd: String,
+        stops: MutableList<String>,
+        mpesaType: String,
+        pochiNumber: String,
+        paybillNumber: String,
+        accountNumber: String,
+        tillNumber: String,
+        sendMoneyPhone: String,
+        onComplete: (Boolean) -> Unit
+    ) {
+        // Check if registration number already exists
+        database.orderByChild("registrationNumber").equalTo(regNumber)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
-                    val matatus = snapshot.children.mapNotNull { it.child("regNumber").getValue(String::class.java) }
+                    if (snapshot.exists()) {
+                        Log.e("MatatuRepository", "Registration number already exists!")
+                        onComplete(false)
+                    } else {
+                        val matatuId = database.push().key ?: return // Generate unique ID
+
+                        val matatuData = mapOf(
+                            "operatorId" to operatorId,
+                            "registrationNumber" to regNumber,
+                            "routeStart" to routeStart,
+                            "routeEnd" to routeEnd,
+                            "stops" to stops,
+                            "mpesaOption" to mpesaType,
+                            "pochiNumber" to pochiNumber,
+                            "paybillNumber" to paybillNumber,
+                            "accountNumber" to accountNumber,
+                            "tillNumber" to tillNumber,
+                            "sendMoneyPhone" to sendMoneyPhone
+                        )
+
+                        database.child(matatuId).setValue(matatuData)
+                            .addOnSuccessListener {
+                                onComplete(true)  // Registration successful
+                            }
+                            .addOnFailureListener {
+                                Log.e("MatatuRepository", "Error registering matatu", it)
+                                onComplete(false)
+                            }
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("MatatuRepository", "Error checking registration number: \${error.message}")
+                    onComplete(false)
+                }
+            })
+    }
+
+    // ✅ Fetch all matatus under a specific operator (Real-Time Updates)
+    fun fetchMatatusForOperator(operatorId: String, onResult: (List<Matatu>) -> Unit) {
+        database.orderByChild("operatorId").equalTo(operatorId)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val matatus = snapshot.children.mapNotNull { it.getValue(Matatu::class.java) }
                     onResult(matatus)
                 }
 
                 override fun onCancelled(error: DatabaseError) {
+                    Log.e("MatatuRepository", "Error fetching matatus: \${error.message}")
                     onResult(emptyList())
                 }
             })
     }
 
-    fun saveMatatuDetails(
-        operatorId: String,
-        regNumber: String,
-        route: String,
-        onComplete: (String, Bitmap?) -> Unit
-    ) {
-        val uniqueCode = UUID.randomUUID().toString()
-        val qrBitmap = QRCodeGenerator.generateQRCode(uniqueCode)
-        val matatuData = mapOf(
-            "operatorId" to operatorId,
-            "regNumber" to regNumber,
-            "route" to route,
-            "uniqueCode" to uniqueCode
-        )
+    // ✅ Fetch a single matatu's details (Real-Time Updates)
+    fun fetchMatatuDetails(matatuId: String, onResult: (Matatu?) -> Unit) {
+        database.child(matatuId)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val matatu = snapshot.getValue(Matatu::class.java)
+                    onResult(matatu)
+                }
 
-        database.push().setValue(matatuData).addOnSuccessListener {
-            onComplete(uniqueCode, qrBitmap)
-        }.addOnFailureListener {
-            onComplete("", null)
-        }
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("MatatuRepository", "Error fetching matatu details: \${error.message}")
+                    onResult(null)
+                }
+            })
+    }
+
+    // ✅ Delete a matatu
+    fun deleteMatatu(matatuId: String, onComplete: (Boolean) -> Unit) {
+        database.child(matatuId)
+            .removeValue()
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener {
+                Log.e("MatatuRepository", "Error deleting matatu", it)
+                onComplete(false)
+            }
     }
 }

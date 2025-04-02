@@ -1,85 +1,108 @@
 package com.example.dynamic_fare
 
 import androidx.compose.runtime.Composable
-import androidx.navigation.NavHostController
+import androidx.navigation.*
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
+import com.example.dynamic_fare.Routes.PaymentScreen
 import com.example.dynamic_fare.ui.*
-import com.example.dynamic_fare.ui.screens.OperatorHomeScreen
+import com.example.dynamic_fare.ui.screens.*
+import com.example.dynamic_fare.ui.screens.RegistrationScreen
+import com.example.dynamic_fare.FareManager
+import com.example.dynamic_fare.TimeManager
+import com.example.dynamic_fare.WeatherManager
 
 object Routes {
     const val LoginScreenContent = "login"
-    const val MatatuEstimateScreen = "clientHome"
-    const val PaymentPage = "PaymentPage"
-    const val RouteSelectionScreen = "RouteSelectionScreen"
     const val SignUpScreen = "signup"
-    const val FooterWithIcons = "FooterWithIcons"
-    // Operator Home now expects an operatorId argument.
-    const val OperatorHome = "operatorHome/{operatorId}"
+    const val MatatuEstimateScreen = "clientHome"
     const val PasswordRecoveryScreen = "passwordRecovery"
-    // Registration screen now takes both operatorId and fleetId.
-    const val RegistrationScreen = "registration_screen/{operatorId}/{fleetId}"
-    // Extra routes for choosing registration type and separate fleet/matatu registration:
-    const val ChooseFleetDialog = "chooseFleet"
+    const val OperatorHome = "operatorHome/{operatorId}"
+    const val RegistrationScreen = "registration_screen/{operatorId}?fleetId={fleetId}"
+    const val ChooseFleetDialog = "chooseFleet/{operatorId}"
     const val FleetRegistrationScreen = "fleetRegistration/{operatorId}"
-    const val MatatuRegistrationScreen = "matatuRegistration/{operatorId}"
-    const val MatatuInfoScreen = "matatuInfo/{matatuId}"
+    const val FleetDetailsScreen = "fleetDetails/{fleetId}"
+    const val ProfileScreen = "profile/{userId}"
+    const val SettingsScreen = "settings/{userId}"
+    const val MatatuInfoScreen = "matatuInfoScreen/{operatorId}/{matatuId}"
+    const val MatatuDetailsScreen = "matatuDetails/{matatuId}"
+    const val FareDetailsScreen = "fareDetails/{matatuId}"
+    const val QRScannerScreen = "qrScanner"
+    const val PaymentScreen = "paymentScreen/{scannedData}"
+    const val FareTabbedScreen = "fare_tabbed_screen/{matatuId}"
+    const val FleetAndFareTabs = "fleetAndFare/{fleetId}"
+    const val SetFaresScreen = "setFares/{matatuId}"
+    const val FareDisplayScreen = "fareDisplay/{matatuId}"
+    const val PaymentPage = "paymentPage/{scannedQRCode}"
 }
 
 @Composable
-fun AppNavigation(navController: NavHostController, signUpViewModel: SignUpViewModel) {
+fun AppNavigation(
+    navController: NavHostController,
+    signUpViewModel: SignUpViewModel,
+    fareManager: FareManager,
+    getMatatuIdFromRegistration: (String) -> String,
+    timeManager: TimeManager,
+    weatherManager: WeatherManager
+) {
     NavHost(navController = navController, startDestination = Routes.LoginScreenContent) {
         composable(Routes.LoginScreenContent) { LoginScreenContent(navController) }
         composable(Routes.SignUpScreen) { SignUpScreen(navController, signUpViewModel) }
         composable(Routes.MatatuEstimateScreen) { MatatuEstimateScreen(navController) }
         composable(Routes.PasswordRecoveryScreen) { PasswordRecoveryScreen(navController) }
-        composable(Routes.FooterWithIcons) { ProfileScreen() }
-
-        // Operator Home Screen – passes operatorId from the nav arguments
-        composable(Routes.OperatorHome) { backStackEntry ->
-            val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
-            OperatorHomeScreen(navController, operatorId)
-        }
-
-        // Registration Screen for single matatu OR fleet choice – passes both operatorId and fleetId.
-        // fleetId can be an empty string if not used.
-        composable(Routes.RegistrationScreen) { backStackEntry ->
-            val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
-            val fleetId = backStackEntry.arguments?.getString("fleetId") ?: ""
-            // Here we call the MatatuRegistrationScreen which you can update to handle both cases.
-            MatatuRegistrationScreen(navController, operatorId, if (fleetId.isEmpty()) null else fleetId)
-        }
-
-        // Choose Fleet Dialog – a pop-up that asks whether the user wants to register a fleet or a single matatu.
-        composable(Routes.ChooseFleetDialog) { backStackEntry ->
-            val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
-            ChooseFleetDialog(
-                onDismiss = { navController.popBackStack() },
-                onSelection = { isFleet ->
-                    val route = if (isFleet) Routes.FleetRegistrationScreen else Routes.MatatuRegistrationScreen
-                    // We append the operatorId as argument.
-                    navController.navigate("$route/$operatorId")
-                }
-            )
-        }
-
-        // Fleet Registration Screen
-        composable(Routes.FleetRegistrationScreen) { backStackEntry ->
-            val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
-            FleetRegistrationScreen(navController, operatorId)
-        }
-
-        // Matatu Registration Screen (for when not choosing fleet mode)
-        composable(Routes.MatatuRegistrationScreen) { backStackEntry ->
-            val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
-            // In this case, fleetId is not passed so default to null.
-            MatatuRegistrationScreen(navController, operatorId, null)
-        }
-
-        // Matatu Info Screen
-        composable(Routes.MatatuInfoScreen) { backStackEntry ->
+        composable(Routes.FareTabbedScreen) { backStackEntry ->
             val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
-            MatatuInfoScreen(navController, matatuId)
+            FareTabbedScreen(navController, matatuId)
+        }
+        composable(Routes.FareDisplayScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) { backStackEntry ->
+            val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
+            FareDisplayScreen(matatuId)
+        }
+
+        composable(Routes.ProfileScreen, arguments = listOf(navArgument("userId") { type = NavType.StringType })) {
+                backStackEntry -> ProfileScreen(navController, backStackEntry.arguments?.getString("userId") ?: "")
+        }
+
+        composable(Routes.SettingsScreen, arguments = listOf(navArgument("userId") { type = NavType.StringType })) {
+                backStackEntry -> SettingsScreen(navController, backStackEntry.arguments?.getString("userId") ?: "")
+        }
+
+        composable(Routes.OperatorHome, arguments = listOf(navArgument("operatorId") { type = NavType.StringType })) {
+                backStackEntry -> OperatorHomeScreen(navController, backStackEntry.arguments?.getString("operatorId") ?: "")
+        }
+
+        composable(Routes.FleetRegistrationScreen, arguments = listOf(navArgument("operatorId") { type = NavType.StringType })) {
+                backStackEntry -> FleetRegistrationScreen(navController, backStackEntry.arguments?.getString("operatorId") ?: "")
+        }
+
+        composable(Routes.FleetDetailsScreen, arguments = listOf(navArgument("fleetId") { type = NavType.StringType })) {
+                backStackEntry -> FleetDetailsScreen(navController, backStackEntry.arguments?.getString("fleetId") ?: "")
+        }
+
+        composable(Routes.RegistrationScreen, arguments = listOf(
+            navArgument("operatorId") { type = NavType.StringType },
+            navArgument("fleetId") { type = NavType.StringType; defaultValue = "" }
+        )) {
+                backStackEntry -> RegistrationScreen(navController, backStackEntry.arguments?.getString("operatorId") ?: "")
+        }
+
+        composable(Routes.SetFaresScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) { backStackEntry ->
+            val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
+            SetFaresScreen(matatuId)
+        }
+
+        composable(Routes.MatatuDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) {
+                backStackEntry -> MatatuDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
+        }
+        composable(Routes.FleetAndFareTabs, arguments = listOf(navArgument("fleetId") { type = NavType.StringType })) {
+                backStackEntry ->
+            val fleetId = backStackEntry.arguments?.getString("fleetId") ?: ""
+            FleetAndFareTabs(navController, fleetId)
+        }
+
+        composable(Routes.FareDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) {
+                backStackEntry -> FareDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
         }
     }
 }

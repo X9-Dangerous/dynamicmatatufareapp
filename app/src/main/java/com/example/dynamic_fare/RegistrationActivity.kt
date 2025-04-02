@@ -4,30 +4,25 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.navigation.compose.rememberNavController
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
+import com.example.dynamic_fare.ui.screens.RegistrationScreen
+import com.example.dynamic_fare.utils.FirebaseHelper
 
 class RegistrationActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val userId = FirebaseAuth.getInstance().currentUser?.uid
-        val databaseRef = FirebaseDatabase.getInstance().getReference("users")
-
-        databaseRef.child(userId ?: "").child("operatorId").get()
-            .addOnSuccessListener { snapshot ->
-                val operatorId = snapshot.getValue(String::class.java) ?: ""
-                launchRegistrationScreen(operatorId)
-            }
-            .addOnFailureListener {
-                launchRegistrationScreen("")
-            }
+        FirebaseHelper.getOperatorId(
+            onSuccess = { operatorId -> launchRegistrationScreen(operatorId) },
+            onFailure = { launchRegistrationScreen("") }
+        )
     }
 
     private fun launchRegistrationScreen(operatorId: String) {
+        val sampleRoutes = listOf("Route 1", "Route 2", "Route 3") // Example routes
+
         setContent {
             val navController = rememberNavController()
-            RegistrationScreen(navController, operatorId)
+            RegistrationScreen(navController = navController, operatorId = operatorId)
         }
     }
 }

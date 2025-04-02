@@ -2,8 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Request permission for notifications on Android 13+ -->
+    <!-- Permissions -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+
+
 
     <application
         android:allowBackup="true"
@@ -15,6 +21,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DynamicMatauFareApp"
         tools:targetApi="31">
+
+        <!-- Main Activity -->
         <activity
             android:name="com.example.dynamic_fare.MainActivity"
             android:exported="true"
@@ -22,10 +30,13 @@
             android:theme="@style/Theme.DynamicMatauFareApp">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Fix: Correct SetFaresActivity path -->
+        <activity android:name="com.example.dynamic_fare.SetFaresActivity" />
+
     </application>
 
 </manifest>

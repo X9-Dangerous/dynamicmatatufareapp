@@ -5,21 +5,25 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.dynamic_fare.Routes.FleetRegistrationScreen
-import com.example.dynamic_fare.Routes.MatatuInfoScreen
-import com.example.dynamic_fare.Routes.MatatuRegistrationScreen
+import androidx.navigation.navArgument
+import com.example.dynamic_fare.ui.screens.RegistrationScreen
 import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.example.dynamic_fare.ui.screens.*
 import com.example.dynamic_fare.ui.ChooseFleetDialog
 import com.example.dynamic_fare.ui.FleetRegistrationScreen
-import com.example.dynamic_fare.ui.MatatuInfoScreen
-import com.example.dynamic_fare.ui.MatatuRegistrationScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.example.dynamic_fare.data.SettingsDataStore
+import com.example.dynamic_fare.ui.screens.setLocale
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,13 +32,24 @@ class MainActivity : ComponentActivity() {
 
         val auth = FirebaseAuth.getInstance()
         val db = FirebaseDatabase.getInstance().reference
+        val operatorId = auth.currentUser?.uid ?: ""
+        val database = AppDatabase.getDatabase(this)
+        val fareManager = FareManager(FirebaseDatabase)
+        val timeManager = TimeManager()
+        val weatherManager = WeatherManager()
+        val getMatatuIdFromRegistration = GetMatatuIdFromRegistration()
+        val apiKey = "https://api.openweathermap.org/data/2.5/weather?&appid" // Replace with actual API key
+
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                SettingsDataStore.getLanguage(applicationContext, userId = operatorId).collect { langCode ->
+                    setLocale(this@MainActivity, langCode)
+                }
+            }
+        }
 
         try {
             Log.d("MainActivity", "Initializing database")
-            val database = AppDatabase.getDatabase(this)
-            Log.d("MainActivity", "Starting GTFS import")
-            GTFSimporter.importGTFS(this, database)
-            Log.d("MainActivity", "GTFS import initiated")
         } catch (e: Exception) {
             Log.e("MainActivity", "Error initializing database: ${e.message}", e)
         }
@@ -48,19 +63,49 @@ class MainActivity : ComponentActivity() {
                 NavHost(navController = navController, startDestination = Routes.LoginScreenContent) {
                     composable(Routes.LoginScreenContent) { LoginScreenContent(navController) }
                     composable(Routes.SignUpScreen) { SignUpScreen(navController, signUpViewModel) }
-                    composable(Routes.OperatorHome) { backStackEntry ->
-                        val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
-                        OperatorHomeScreen(navController, operatorId)
+
+                    composable(Routes.OperatorHome, arguments = listOf(
+                        navArgument("operatorId") { type = NavType.StringType }
+                    )) { backStackEntry ->
+                        val id = backStackEntry.arguments?.getString("operatorId") ?: ""
+                        OperatorHomeScreen(navController, id)
+                    }
+                    composable(Routes.MatatuDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) {
+                            backStackEntry -> MatatuDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
                     }
                     composable(Routes.MatatuEstimateScreen) { MatatuEstimateScreen(navController) }
                     composable(Routes.PasswordRecoveryScreen) { PasswordRecoveryScreen(navController) }
-                    composable(Routes.FooterWithIcons) { ProfileScreen() }
-                    composable(Routes.RegistrationScreen) { backStackEntry ->
-                        val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
-                        RegistrationScreen(navController, operatorId)
+                    composable(Routes.SetFaresScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) { backStackEntry ->
+                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
+                        SetFaresScreen(matatuId)
                     }
-                    composable(Routes.ChooseFleetDialog) { backStackEntry ->
-                        val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
+                    composable(Routes.ProfileScreen, arguments = listOf(
+                        navArgument("userId") { type = NavType.StringType }
+                    )) { backStackEntry ->
+                        val id = backStackEntry.arguments?.getString("userId") ?: operatorId
+                        ProfileScreen(navController, id)
+                    }
+                    composable(Routes.FareTabbedScreen) { backStackEntry ->
+                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
+                        FareTabbedScreen(navController, matatuId)
+                    }
+                    composable(Routes.SettingsScreen, arguments = listOf(
+                        navArgument("userId") { type = NavType.StringType }
+                    )) { backStackEntry ->
+                        val id = backStackEntry.arguments?.getString("userId") ?: operatorId
+                        SettingsScreen(navController, id)
+                    }
+
+                    composable(Routes.RegistrationScreen, arguments = listOf(
+                        navArgument("operatorId") { type = NavType.StringType },
+                        navArgument("fleetId") { type = NavType.StringType; defaultValue = "" }
+                    )) { backStackEntry ->
+                        val id = backStackEntry.arguments?.getString("operatorId") ?: operatorId
+                        val fleetId = backStackEntry.arguments?.getString("fleetId") ?: ""
+                        RegistrationScreen(navController, id)
+                    }
+
+                    composable(Routes.ChooseFleetDialog) {
                         ChooseFleetDialog(
                             onDismiss = { navController.popBackStack() },
                             onSelection = { isFleet ->
@@ -73,17 +118,27 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
-                    composable(Routes.FleetRegistrationScreen) { backStackEntry ->
-                        val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
-                        FleetRegistrationScreen(navController, operatorId)
+
+                    composable(
+                        Routes.PaymentPage,
+                        arguments = listOf(navArgument("scannedQRCode") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val scannedQRCode = backStackEntry.arguments?.getString("scannedQRCode") ?: ""
+                        PaymentPage(
+                            navController = navController,
+                            scannedQRCode = scannedQRCode,
+                            fareManager = fareManager,
+                            getMatatuIdFromRegistration = getMatatuIdFromRegistration,
+                            timeManager = timeManager,
+                            weatherManager = weatherManager,
+                            apiKey = apiKey
+                        )
                     }
-                    composable(Routes.MatatuRegistrationScreen) { backStackEntry ->
-                        val operatorId = backStackEntry.arguments?.getString("operatorId") ?: ""
-                        MatatuRegistrationScreen(navController, operatorId)
-                    }
-                    composable(Routes.MatatuInfoScreen) { backStackEntry ->
-                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
-                        MatatuInfoScreen(navController, matatuId)
+
+                    composable(Routes.QRScannerScreen) {
+                        QRScannerScreen(navController) { scannedData ->
+                            navController.navigate(Routes.PaymentScreen.replace("{scannedData}", scannedData))
+                        }
                     }
                 }
             }

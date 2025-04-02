@@ -90,7 +90,7 @@ class MpesaService {
     }
 
     // Function to initiate STK push
-    fun initiateMpesaPayment(phone: String, amount: Int, callback: (Boolean, String) -> Unit) {
+    fun initiateMpesaPayment(phoneOrPaybill: String, amount: Int, accountRef: String? = null, callback: (Boolean, String) -> Unit) {
         getMpesaToken { token ->
             if (token == null) {
                 callback(false, "Failed to get access token")
@@ -104,14 +104,15 @@ class MpesaService {
             )
 
             val requestBody = PaymentRequest(
-                BusinessShortCode = businessShortCode,
+                BusinessShortCode = if (accountRef == null) businessShortCode else phoneOrPaybill,  // Use phone for normal payments, paybill otherwise
                 Password = password,
                 Timestamp = timestamp,
                 Amount = amount.toString(),
-                PartyA = phone,
+                PartyA = phoneOrPaybill,
                 PartyB = businessShortCode,
-                PhoneNumber = phone,
-                CallBackURL = callbackUrl
+                PhoneNumber = phoneOrPaybill,
+                CallBackURL = callbackUrl,
+                AccountReference = accountRef ?: "DynamicMatau"
             )
 
             apiService.initiatePayment("Bearer $token", requestBody).enqueue(object : Callback<ResponseBody> {
@@ -127,6 +128,5 @@ class MpesaService {
                     callback(false, "Network error: ${t.message}")
                 }
             })
-        }
+        }}
     }
-}

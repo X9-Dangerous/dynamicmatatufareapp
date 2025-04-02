@@ -176,8 +176,8 @@ fun LoginScreenContent(navController: NavController) {
                 fontWeight = FontWeight.Bold,
                 color = Color.Blue,
                 modifier = Modifier.clickable {
-                    navController.navigate("signup") {
-                        popUpTo("login") { inclusive = true }
+                    navController.navigate(Routes.SignUpScreen) {
+                        popUpTo(Routes.LoginScreenContent) { inclusive = true }
                     }
                 }
             )
@@ -195,7 +195,7 @@ fun navigateByRole(navController: NavController, role: String?) {
         db.get().addOnSuccessListener { snapshot ->
             val operatorId = snapshot.value as? String
             if (!operatorId.isNullOrEmpty()) {
-                navController.navigate("operatorHome/$operatorId")
+                navController.navigate(Routes.OperatorHome)
                 {
                     popUpTo(Routes.LoginScreenContent) { inclusive = true }
                 }

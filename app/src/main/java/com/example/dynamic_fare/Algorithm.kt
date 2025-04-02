@@ -1,19 +1,18 @@
+package com.example.dynamic_fare
+
+import android.util.Log
 import com.google.firebase.database.*
 import okhttp3.*
 import org.json.JSONObject
 import java.io.IOException
-
-data class MatatuFares(
-    val offPeakFare: Double = 0.0,
-    val peakFare: Double = 0.0,
-    val rainyOffPeakFare: Double = 0.0,
-    val rainyPeakFare: Double = 0.0
-)
+import java.util.Calendar
+import kotlin.math.*
+import com.example.dynamic_fare.data.GTFSRepository
+import com.example.dynamic_fare.models.MatatuFares
 
 class FareManager(private val database: FirebaseDatabase) {
-
-    fun fetchFares(matatuRegNo: String, callback: (MatatuFares?) -> Unit) {
-        val ref = database.getReference("fares/$matatuRegNo")
+    fun fetchFares(matatuId: String, callback: (MatatuFares?) -> Unit) {
+        val ref = database.getReference("fares/$matatuId")
 
         ref.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -22,64 +21,172 @@ class FareManager(private val database: FirebaseDatabase) {
             }
 
             override fun onCancelled(error: DatabaseError) {
+                Log.e("Firebase", "Failed to fetch fares: ${error.message}")
                 callback(null)
             }
         })
     }
 
-    fun getFare(fares: MatatuFares?, isPeakHours: Boolean, isRaining: Boolean): Double {
-        return when {
-            isPeakHours && isRaining -> fares?.rainyPeakFare ?: 0.0
-            isPeakHours -> fares?.peakFare ?: 0.0
-            isRaining -> fares?.rainyOffPeakFare ?: 0.0
-            else -> fares?.offPeakFare ?: 0.0
+    fun getFare(
+        fares: MatatuFares?,
+        isPeakHours: Boolean,
+        isRaining: Boolean,
+        isDisabled: Boolean,
+        trafficDelay: Boolean
+    ): Pair<Double, String> {
+        val baseFare = when {
+            (isPeakHours || trafficDelay) && isRaining -> fares?.rainyPeakFare ?: 0.0
+            isRaining -> fares?.rainyNonPeakFare ?: 0.0
+            isPeakHours || trafficDelay -> fares?.peakFare ?: 0.0
+            else -> fares?.nonPeakFare ?: 0.0
         }
+
+        var finalFare = baseFare
+        val breakdown = StringBuilder("Base Fare: Ksh $baseFare\n")
+
+        if (isDisabled) {
+            val disabilityDiscount = fares?.disabilityDiscount ?: 0.0
+            finalFare -= disabilityDiscount
+            breakdown.append("Disability Discount Applied: -Ksh $disabilityDiscount\n")
+        }
+
+        val surgeFactor = if (trafficDelay) 1.2 else 1.0
+        finalFare *= surgeFactor
+        breakdown.append("Surge Pricing Factor: x$surgeFactor\n")
+
+        finalFare = max(finalFare, 0.0)
+        breakdown.append("Final Fare: Ksh $finalFare")
+
+        return Pair(finalFare, breakdown.toString())
+    }
+
+    fun getMatatuIdFromRegistration(registrationNumber: String, callback: (String?) -> Unit) {
+        val ref = database.getReference("matatus")
+
+        // Query matatus to find the matatuID using the registration number
+        ref.orderByChild("registrationNumber").equalTo(registrationNumber).limitToFirst(1)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (snapshot.exists()) {
+                        val matatu = snapshot.children.first().getValue(Matatu::class.java)
+                        callback(matatu?.matatuId ?: null)  // Ensure matatuId isn't null
+                    } else {
+                        callback(null)
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("Firebase", "Error fetching matatuID: ${error.message}")
+                    callback(null)
+                }
+            })
     }
 }
 
 class WeatherManager(private val apiKey: String) {
-
     private val client = OkHttpClient()
+    private var cachedWeather: Boolean? = null
+    private var lastFetchTime: Long = 0
 
     fun fetchWeather(city: String, callback: (Boolean) -> Unit) {
-        val url = "https://api.openweathermap.org/data/2.5/weather?q=$city&appid=$apiKey"
+        val currentTime = System.currentTimeMillis()
 
-        val request = Request.Builder()
-            .url(url)
-            .build()
+        // Use cached result if it's recent (10 minutes)
+        if (cachedWeather != null && currentTime - lastFetchTime < 600000) {
+            callback(cachedWeather!!)
+            return
+        }
+
+        val url = "https://api.openweathermap.org/data/2.5/weather?q=$city&appid=$apiKey"
+        val request = Request.Builder().url(url).build()
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                callback(false) // Assume no rain if API call fails
+                Log.e("WeatherAPI", "Failed to fetch weather: ${e.message}")
+                callback(false) // Return false on failure
             }
 
             override fun onResponse(call: Call, response: Response) {
-                response.body?.let { responseBody ->
-                    val json = JSONObject(responseBody.string())
-                    val weather = json.getJSONArray("weather").getJSONObject(0).getString("main")
-                    callback(weather == "Rain")
-                } ?: callback(false)
+                response.use {  // Ensure response is closed after processing
+                    if (!response.isSuccessful) {
+                        Log.e("WeatherAPI", "Unsuccessful response: ${response.code}")
+                        callback(false)
+                        return
+                    }
+
+                    try {
+                        response.body?.string()?.let { responseBody ->
+                            val json = JSONObject(responseBody)
+
+                            if (!json.has("weather")) {
+                                Log.e("WeatherAPI", "Missing 'weather' field in response")
+                                callback(false)
+                                return
+                            }
+
+                            val weather = json.getJSONArray("weather").getJSONObject(0).getString("main")
+                            cachedWeather = weather == "Rain"
+                            lastFetchTime = System.currentTimeMillis()
+                            callback(cachedWeather!!)
+                        } ?: callback(false)
+                    } catch (e: Exception) {
+                        Log.e("WeatherAPI", "Error parsing weather response: ${e.message}")
+                        callback(false)
+                    }
+                }
             }
         })
     }
 }
 
-// 🚀 Example: Fetch Fare Based on Dynamic Weather and QR Scan
-fun processQrScan(qrCodeData: String, city: String, isPeakHours: Boolean) {
+class TimeManager {
+    fun isPeakHours(): Boolean {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return hour in 6..9 || hour in 16..20
+    }
+}
+
+// Main function to process QR scan
+fun processQrScan(
+    qrCodeData: String,
+    city: String,
+    isDisabled: Boolean,
+    trafficDelay: Boolean,
+    gtfsRepository: GTFSRepository,
+    updateUi: (Double, String) -> Unit
+) {
     val database = FirebaseDatabase.getInstance()
     val fareManager = FareManager(database)
-    val weatherManager = WeatherManager("d77ed3bf47a3594d4053bb96e601958f")
+    val weatherManager = WeatherManager("YOUR_OPENWEATHERMAP_API_KEY") // Pass API key safely
+    val timeManager = TimeManager()
 
     val matatuRegNo = qrCodeData.trim()
 
-    weatherManager.fetchWeather(city) { isRaining ->
-        fareManager.fetchFares(matatuRegNo) { fares ->
-            if (fares != null) {
-                val finalFare = fareManager.getFare(fares, isPeakHours, isRaining)
-                println("Final Fare for $matatuRegNo in $city (Rain: $isRaining): Ksh $finalFare")
-            } else {
-                println("⚠️ No fare data found for Matatu: $matatuRegNo")
+    // Step 1: Fetch matatuID using matatuRegNo
+    fareManager.getMatatuIdFromRegistration(matatuRegNo) { matatuId ->
+        if (matatuId != null) {
+            // Step 2: Fetch fares using matatuID
+            weatherManager.fetchWeather(city) { isRaining ->
+                fareManager.fetchFares(matatuId) { fares ->
+                    if (fares != null) {
+                        val isPeakHours = timeManager.isPeakHours()
+                        val (finalFare, breakdown) = fareManager.getFare(fares, isPeakHours, isRaining, isDisabled, trafficDelay)
+                        updateUi(finalFare, breakdown)
+                    } else {
+                        Log.e("FareManager", "No fare data found for Matatu ID: $matatuId")
+                        updateUi(0.0, "⚠️ No fare data found for Matatu ID: $matatuId")
+                    }
+                }
             }
+        } else {
+            Log.e("FareManager", "No matatuID found for Matatu Registration Number: $matatuRegNo")
+            updateUi(0.0, "⚠️ No Matatu found with Registration Number: $matatuRegNo")
         }
     }
 }
+
+// Assuming Matatu class has fields `matatuID` and `registrationNumber`
+data class Matatu(
+    val matatuId: String = "",
+    val registrationNumber: String = ""
+)
