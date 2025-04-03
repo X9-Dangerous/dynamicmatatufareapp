@@ -142,6 +142,24 @@ class MainActivity : ComponentActivity() {
                             navController.navigate(Routes.PaymentScreen.replace("{scannedData}", scannedData))
                         }
                     }
+                    composable(
+                        Routes.PaymentPage,
+                        arguments = listOf(navArgument("scannedQRCode") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val scannedQRCode = backStackEntry.arguments?.getString("scannedQRCode") ?: ""
+                        PaymentPage(
+                            navController = navController,
+                            scannedQRCode = scannedQRCode,
+                            fareManager = fareManager,
+                            weatherManager = weatherManager,
+                            timeManager = timeManager,
+                            getMatatuIdFromRegistration = { registration, callback ->
+                                val matatuId = getMatatuIdFromRegistration(registration)
+                                callback(matatuId)
+                            }
+                        )
+                    }
+
                 }
             }
         }

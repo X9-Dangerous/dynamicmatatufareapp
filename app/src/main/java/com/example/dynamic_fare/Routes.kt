@@ -30,11 +30,11 @@ object Routes {
     const val FareDetailsScreen = "fareDetails/{matatuId}"
     const val QRScannerScreen = "qrScanner"
     const val PaymentScreen = "paymentScreen/{scannedData}"
-    const val FareTabbedScreen = "fare_tabbed_screen/{matatuId}"
+    const val FareTabbedScreen = "fareTabbedScreen/{matatuId}"
     const val FleetAndFareTabs = "fleetAndFare/{fleetId}"
     const val SetFaresScreen = "setFares/{matatuId}"
     const val FareDisplayScreen = "fareDisplay/{matatuId}"
-    const val PaymentPage = "paymentPage/{scannedQRCode}"
+    const val PaymentPage = "paymentPage/{scannedData}"
 }
 
 @Composable
@@ -104,5 +104,23 @@ fun AppNavigation(
         composable(Routes.FareDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) {
                 backStackEntry -> FareDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
         }
+        composable(
+            Routes.PaymentPage,
+            arguments = listOf(navArgument("scannedQRCode") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val scannedQRCode = backStackEntry.arguments?.getString("scannedQRCode") ?: ""
+            PaymentPage(
+                navController = navController,
+                scannedQRCode = scannedQRCode,
+                fareManager = fareManager,
+                weatherManager = weatherManager,
+                timeManager = timeManager,
+                getMatatuIdFromRegistration = { registration, callback ->
+                    val matatuId = getMatatuIdFromRegistration(registration)
+                    callback(matatuId)
+                }
+            )
+        }
+
     }
 }
