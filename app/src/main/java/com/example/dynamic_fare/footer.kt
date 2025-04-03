@@ -40,9 +40,7 @@ fun FooterWithIcons(navController: NavController) {
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
-                        navController.navigate("home") {
-                            // Pop up to the start destination of the graph to
-                            // avoid building up a large stack of destinations
+                        navController.navigate(Routes.MatatuEstimateScreen) {
                             popUpTo("home") { inclusive = true }
                             launchSingleTop = true
                         }
@@ -61,19 +59,10 @@ fun FooterWithIcons(navController: NavController) {
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
-                        navController.navigate("profile")
+                        navController.navigate(Routes.ProfileScreen)
                     }
             )
         }
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun FooterWithIconsPreview() {
-    DynamicMatauFareAppTheme {
-        Surface(color = MaterialTheme.colorScheme.background) {
-            FooterWithIcons(rememberNavController())
-        }
-    }
-}

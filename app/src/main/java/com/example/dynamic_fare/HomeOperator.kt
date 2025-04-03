@@ -1,5 +1,7 @@
 package com.example.dynamic_fare.ui.screens
 
+import android.content.Intent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,57 +11,160 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.dynamic_fare.ui.ChooseFleetDialog
+import com.example.dynamic_fare.Routes
 import com.example.dynamic_fare.data.MatatuRepository
+import com.example.dynamic_fare.data.FleetRepository
+import com.example.dynamic_fare.models.Fleet
+import com.example.dynamic_fare.models.Matatu
 import com.example.dynamic_fare.ui.components.BottomNavigationBar
+import com.example.dynamic_fare.ui.screens.FareTabbedActivity
 
 @Composable
 fun OperatorHomeScreen(navController: NavController, operatorId: String) {
-    var matatuList by remember { mutableStateOf<List<String>>(emptyList()) }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(true) }
+    var selectedTab by remember { mutableStateOf(0) }
+    val matatuList = remember { mutableStateListOf<Matatu>() }
+    val fleetList = remember { mutableStateListOf<Fleet>() }
+    var isLoadingMatatus by remember { mutableStateOf(true) }
+    var isLoadingFleets by remember { mutableStateOf(true) }
+    val currentRoute = navController.currentDestination?.route ?: ""
 
-    LaunchedEffect(operatorId) {
-        MatatuRepository.fetchMatatusForOperator(operatorId) { fetchedMatatus ->
-            matatuList = fetchedMatatus
-            isLoading = false
+    // Fetch data before the screen is rendered
+    LaunchedEffect(Unit) {
+        MatatuRepository.fetchMatatusForOperator(operatorId) { matatus ->
+            matatuList.clear()
+            matatuList.addAll(matatus)
+            isLoadingMatatus = false
+        }
+
+        FleetRepository.fetchFleetsForOperator(operatorId) { fleets ->
+            fleetList.clear()
+            fleetList.addAll(fleets)
+            isLoadingFleets = false
         }
     }
 
     Scaffold(
+        bottomBar = { BottomNavigationBar(navController, currentRoute, operatorId) },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddDialog = true }
+                onClick = {
+                    val route = if (selectedTab == 0) Routes.RegistrationScreen else Routes.FleetRegistrationScreen
+                    navController.navigate(route)
+                }
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Add Matatu/Fleet")
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Add Item")
             }
-        },
-        bottomBar = { BottomNavigationBar(navController) }
+        }
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            LazyColumn {
-                items(matatuList) { matatu ->
-                    Text(text = matatu)
+            TabRow(selectedTabIndex = selectedTab) {
+                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
+                    Text("Single Matatu")
+                }
+                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
+                    Text("Fleet")
+                }
+            }
+
+            if (isLoadingMatatus || isLoadingFleets) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                if (selectedTab == 0) {
+                    MatatuList(navController, matatuList)
+                } else {
+                    FleetList(navController, fleetList)
                 }
             }
         }
     }
+}
 
-    if (showAddDialog) {
-        ChooseFleetDialog(
-            onDismiss = { showAddDialog = false },
-            onSelection = { isFleet ->
-                val route = if (isFleet) "fleetRegistration" else "matatuRegistration"
-                navController.navigate("$route/$operatorId")
+@Composable
+fun MatatuList(navController: NavController, matatuList: MutableList<Matatu>) {
+    if (matatuList.isEmpty()) {
+        EmptyStateMessage("No Matatus Available")
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(matatuList) { matatu ->
+                MatatuDetailItem(matatu)
             }
+        }
+    }
+}
+
+@Composable
+fun MatatuDetailItem(matatu: Matatu) {
+    val context = LocalContext.current
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+            .clickable {
+                val intent = Intent(context, FareTabbedActivity::class.java)
+                intent.putExtra("matatuId", matatu.registrationNumber)
+                context.startActivity(intent)
+            },
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "Registration: ${matatu.registrationNumber}", style = MaterialTheme.typography.bodyMedium)
+            Text(text = "Route: ${matatu.routeStart} → ${matatu.routeEnd}", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+fun FleetList(navController: NavController, fleetList: List<Fleet>) {
+    if (fleetList.isEmpty()) {
+        EmptyStateMessage("No Fleets Available")
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(fleetList) { fleet ->
+                FleetDetailItem(fleet)
+            }
+        }
+    }
+}
+
+@Composable
+fun FleetDetailItem(fleet: Fleet) {
+    val context = LocalContext.current
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+            .clickable {
+                val intent = Intent(context, FareTabbedActivity::class.java)
+                intent.putExtra("matatuId", fleet.fleetName)
+                context.startActivity(intent)
+            },
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Text(
+            text = "Fleet: ${fleet.fleetName}",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(16.dp)
         )
+    }
+}
+
+@Composable
+fun EmptyStateMessage(message: String) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(message, style = MaterialTheme.typography.bodyMedium)
     }
 }

@@ -7,27 +7,30 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import com.example.dynamic_fare.Routes
 
 @Composable
-fun BottomNavigationBar(navController: NavController) {
+fun BottomNavigationBar(navController: NavController, userId: String, currentRoute: String?) {
+    val items = listOf(
+        BottomNavItem("Home", Icons.Default.Home, Routes.OperatorHome),
+        BottomNavItem("Profile", Icons.Default.Person, Routes.ProfileScreen),
+        BottomNavItem("Settings", Icons.Default.Settings, Routes.SettingsScreen)
+    )
+
     NavigationBar {
-        NavigationBarItem(
-            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-            label = { Text("Home") },
-            selected = false,
-            onClick = { navController.navigate("home") }
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
-            label = { Text("Profile") },
-            selected = false,
-            onClick = { navController.navigate("profile") }
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Default.Settings, contentDescription = "Register") },
-            label = { Text("Register") },
-            selected = false,
-            onClick = { navController.navigate("register_operator") }
-        )
+        items.forEach { item ->
+            NavigationBarItem(
+                icon = { Icon(item.icon, contentDescription = item.label) },
+                label = { Text(item.label) },
+                selected = currentRoute == item.route,
+                onClick = {
+                    if (currentRoute != item.route) {
+                        navController.navigate(item.route)
+                    }
+                }
+            )
+        }
     }
 }
+
+data class BottomNavItem(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val route: String)

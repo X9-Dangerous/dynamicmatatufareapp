@@ -37,7 +37,6 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.location.*
-import com.google.android.gms.location.LocationServices
 import okhttp3.*
 import org.json.JSONObject
 import org.osmdroid.config.Configuration

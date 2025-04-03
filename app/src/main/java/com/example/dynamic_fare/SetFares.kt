@@ -1,6 +1,10 @@
 package com.example.dynamic_fare
 
+
+import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,27 +21,31 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.dynamic_fare.data.FareRepository
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.DatabaseReference
 
 class SetFaresActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val matatuId = intent.getStringExtra("matatuId") ?: ""
         setContent {
-            SetFaresScreen()
+            SetFaresScreen(matatuId)
         }
     }
 }
 
 @Composable
-fun SetFaresScreen() {
-    val db = FirebaseFirestore.getInstance()
+fun SetFaresScreen(matatuId: String) {
+    val db = FirebaseDatabase.getInstance()
     val context = LocalContext.current
 
     // State variables to store fare values
     var peakHours by remember { mutableStateOf("") }
     var nonPeakHours by remember { mutableStateOf("") }
-    var rainingFare by remember { mutableStateOf("") }
-    var nonRainingFare by remember { mutableStateOf("") }
+    var rainingPeakFare by remember { mutableStateOf("") }
+    var rainingNonPeakFare by remember { mutableStateOf("") }
+    var disabilityDiscount by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
 
     Column(
@@ -70,7 +78,7 @@ fun SetFaresScreen() {
         OutlinedTextField(
             value = nonPeakHours,
             onValueChange = { nonPeakHours = it },
-            label = { Text("Non-Peak Hours Fare") },
+            label = { Text("Set Non-Peak Hours Fare") },
             keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
@@ -78,9 +86,9 @@ fun SetFaresScreen() {
         Spacer(modifier = Modifier.height(20.dp))
 
         OutlinedTextField(
-            value = rainingFare,
-            onValueChange = { rainingFare = it },
-            label = { Text("Fare When Raining") },
+            value = rainingPeakFare,
+            onValueChange = { rainingPeakFare = it },
+            label = { Text(" Set Rainy Peak Hours Fare") },
             keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
@@ -88,9 +96,19 @@ fun SetFaresScreen() {
         Spacer(modifier = Modifier.height(20.dp))
 
         OutlinedTextField(
-            value = nonRainingFare,
-            onValueChange = { nonRainingFare = it },
-            label = { Text("Fare When Not Raining") },
+            value = rainingNonPeakFare,
+            onValueChange = { rainingNonPeakFare = it },
+            label = { Text("Set Rainy Non-Peak Hours Fare") },
+            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        OutlinedTextField(
+            value = disabilityDiscount,
+            onValueChange = { disabilityDiscount = it },
+            label = { Text("Set Disability Discount (Optional)") },
             keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
@@ -98,13 +116,26 @@ fun SetFaresScreen() {
         Spacer(modifier = Modifier.height(70.dp))
 
         // Save Button
+
         Button(
             onClick = {
-                saveFaresToFirebase(db, peakHours, nonPeakHours, rainingFare, nonRainingFare) {
-                    message = it
+                FareRepository.saveFares(
+                    matatuId, peakHours, nonPeakHours,
+                    rainingPeakFare, rainingNonPeakFare, disabilityDiscount
+                ) { resultMessage ->
+                    message = resultMessage
+
+                    if (resultMessage == "✅ Fares saved successfully!") {
+                        Handler(Looper.getMainLooper()).post {
+                            val intent = Intent(context, FareDisplayActivity::class.java).apply {
+                                putExtra("matatuId", matatuId)
+                            }
+                            context.startActivity(intent)
+                        }
+                    }
                 }
             },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B51E0)), // Purple color
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B51E0)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Save Fares")
@@ -120,34 +151,43 @@ fun SetFaresScreen() {
 }
 
 fun saveFaresToFirebase(
-    db: FirebaseFirestore,
+    db: FirebaseDatabase,
+    matatuId: String,
     peak: String,
     nonPeak: String,
-    rain: String,
-    noRain: String,
+    rainyPeak: String,
+    rainyNonPeak: String,
+    discount: String,
     onResult: (String) -> Unit
 ) {
-    val fareData = hashMapOf(
+    val fareData = mutableMapOf(
         "peak_hours" to peak,
         "non_peak_hours" to nonPeak,
-        "raining_fare" to rain,
-        "non_raining_fare" to noRain
+        "rainy_peak_hours" to rainyPeak,
+        "rainy_non_peak_hours" to rainyNonPeak
     )
 
-    db.collection("fares")
-        .document("matatu_fares")
-        .set(fareData)
+    // Only add discount if it's not empty
+    if (discount.isNotEmpty()) {
+        fareData["disability_discount"] = discount
+    }
+
+    // Save to Firebase
+    val faresRef: DatabaseReference = db.reference.child("fares").child(matatuId)
+
+    faresRef.setValue(fareData)
         .addOnSuccessListener {
-            Log.d("Firestore", "Fares saved successfully")
+            Log.d("RealtimeDB", "Fares saved successfully")
             onResult("Fares saved successfully!")
         }
         .addOnFailureListener { e ->
-            Log.e("Firestore", "Error saving fares", e)
+            Log.e("RealtimeDB", "Error saving fares", e)
             onResult("Error saving fares: ${e.message}")
         }
 }
+
 @Preview(showBackground = true)
 @Composable
 fun SetFaresScreenPreview() {
-    SetFaresScreen()
+    SetFaresScreen(matatuId = "")
 }
