@@ -157,13 +157,13 @@ fun processQrScan(
 ) {
     val database = FirebaseDatabase.getInstance()
     val fareManager = FareManager(database)
-    val weatherManager = WeatherManager("YOUR_OPENWEATHERMAP_API_KEY") // Pass API key safely
+    val weatherManager = WeatherManager("d77ed3bf47a3594d4053bb96e601958f") // Pass API key safely
     val timeManager = TimeManager()
 
     val matatuRegNo = qrCodeData.trim()
 
     // Step 1: Fetch matatuID using matatuRegNo
-    fareManager.getMatatuIdFromRegistration(matatuRegNo) { matatuId ->
+    fareManager.getMatatuIdFromRegistration(registrationNumber = matatuRegNo) { matatuId ->
         if (matatuId != null) {
             // Step 2: Fetch fares using matatuID
             weatherManager.fetchWeather(city) { isRaining ->

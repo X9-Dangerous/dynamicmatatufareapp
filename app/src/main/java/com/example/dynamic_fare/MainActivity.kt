@@ -25,6 +25,7 @@ import com.example.dynamic_fare.data.SettingsDataStore
 import com.example.dynamic_fare.ui.screens.setLocale
 import kotlinx.coroutines.launch
 
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,11 +35,13 @@ class MainActivity : ComponentActivity() {
         val db = FirebaseDatabase.getInstance().reference
         val operatorId = auth.currentUser?.uid ?: ""
         val database = AppDatabase.getDatabase(this)
-        val fareManager = FareManager(FirebaseDatabase)
+        val fareManager = FareManager(FirebaseDatabase.getInstance())
         val timeManager = TimeManager()
-        val weatherManager = WeatherManager()
-        val getMatatuIdFromRegistration = GetMatatuIdFromRegistration()
-        val apiKey = "https://api.openweathermap.org/data/2.5/weather?&appid" // Replace with actual API key
+        val apiKey = "d77ed3bf47a3594d4053bb96e601958f"
+        val weatherManager = WeatherManager(apiKey)
+        val getMatatuIdFromRegistration = fareManager::getMatatuIdFromRegistration
+
+
 
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -131,7 +134,6 @@ class MainActivity : ComponentActivity() {
                             getMatatuIdFromRegistration = getMatatuIdFromRegistration,
                             timeManager = timeManager,
                             weatherManager = weatherManager,
-                            apiKey = apiKey
                         )
                     }
 

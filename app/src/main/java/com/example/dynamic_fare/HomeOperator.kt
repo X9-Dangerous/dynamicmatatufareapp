@@ -1,4 +1,3 @@
-
 package com.example.dynamic_fare.ui.screens
 
 import android.content.Intent
@@ -23,6 +22,7 @@ import com.example.dynamic_fare.data.FleetRepository
 import com.example.dynamic_fare.models.Fleet
 import com.example.dynamic_fare.models.Matatu
 import com.example.dynamic_fare.ui.components.BottomNavigationBar
+import com.example.dynamic_fare.ui.screens.FareTabbedActivity
 
 @Composable
 fun OperatorHomeScreen(navController: NavController, operatorId: String) {
@@ -97,24 +97,25 @@ fun MatatuList(navController: NavController, matatuList: MutableList<Matatu>) {
     } else {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(matatuList) { matatu ->
-                MatatuDetailItem(
-                    matatu = matatu,
-                    onClick = { navController.navigate(Routes.FareTabbedScreen) },
-                )
+                MatatuDetailItem(matatu)
             }
         }
     }
 }
 
 @Composable
-fun MatatuDetailItem(matatu: Matatu, onClick: () -> Unit) {
+fun MatatuDetailItem(matatu: Matatu) {
     val context = LocalContext.current
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
-            .clickable { onClick() }, // Fixed: Added onClick parameter
+            .clickable {
+                val intent = Intent(context, FareTabbedActivity::class.java)
+                intent.putExtra("matatuId", matatu.registrationNumber)
+                context.startActivity(intent)
+            },
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -131,21 +132,25 @@ fun FleetList(navController: NavController, fleetList: List<Fleet>) {
     } else {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(fleetList) { fleet ->
-                FleetDetailItem(fleet = fleet) {
-                    navController.navigate(Routes.FareTabbedScreen)
-                }
+                FleetDetailItem(fleet)
             }
         }
     }
 }
 
 @Composable
-fun FleetDetailItem(fleet: Fleet, onClick: () -> Unit) {
+fun FleetDetailItem(fleet: Fleet) {
+    val context = LocalContext.current
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
-            .clickable { onClick() },
+            .clickable {
+                val intent = Intent(context, FareTabbedActivity::class.java)
+                intent.putExtra("matatuId", fleet.fleetName)
+                context.startActivity(intent)
+            },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Text(
@@ -163,4 +168,3 @@ fun EmptyStateMessage(message: String) {
         Text(message, style = MaterialTheme.typography.bodyMedium)
     }
 }
-
