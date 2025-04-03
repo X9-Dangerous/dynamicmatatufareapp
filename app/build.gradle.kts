@@ -75,6 +75,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("androidx.room:room-ktx:2.6.1")
+    implementation(libs.play.services.location)
     kapt("androidx.room:room-compiler:2.6.1")
     implementation("io.coil-kt:coil-compose:2.4.0")
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
