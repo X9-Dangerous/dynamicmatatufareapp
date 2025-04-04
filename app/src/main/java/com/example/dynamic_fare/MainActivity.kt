@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
 
                     composable(Routes.QRScannerScreen) {
                         QRScannerScreen(navController) { scannedData ->
-                            navController.navigate(Routes.PaymentScreen.replace("{scannedData}", scannedData))
+                            navController.navigate(Routes.PaymentScreen.replace("{scannedQRCode}", scannedData))
                         }
                     }
                     composable(
@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
                             timeManager = timeManager,
                             getMatatuIdFromRegistration = { registration, callback ->
                                 val matatuId = getMatatuIdFromRegistration(registration)
-                                callback(matatuId)
+                                callback(matatuId.toString())
                             }
                         )
                     }
@@ -163,5 +163,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun getMatatuIdFromRegistration(registration: String) {
+
     }
 }

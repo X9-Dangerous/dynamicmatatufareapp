@@ -29,12 +29,12 @@ object Routes {
     const val MatatuDetailsScreen = "matatuDetails/{matatuId}"
     const val FareDetailsScreen = "fareDetails/{matatuId}"
     const val QRScannerScreen = "qrScanner"
-    const val PaymentScreen = "paymentScreen/{scannedData}"
+    const val PaymentScreen = "paymentScreen/{scannedQRCode}"
     const val FareTabbedScreen = "fareTabbedScreen/{matatuId}"
     const val FleetAndFareTabs = "fleetAndFare/{fleetId}"
     const val SetFaresScreen = "setFares/{matatuId}"
     const val FareDisplayScreen = "fareDisplay/{matatuId}"
-    const val PaymentPage = "paymentPage/{scannedData}"
+    const val PaymentPage = "paymentPage/{scannedQRCode}"
 }
 
 @Composable
