@@ -5,7 +5,6 @@ import androidx.navigation.*
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.dynamic_fare.Routes.PaymentScreen
 import com.example.dynamic_fare.ui.*
 import com.example.dynamic_fare.ui.screens.*
 import com.example.dynamic_fare.ui.screens.RegistrationScreen
@@ -18,8 +17,8 @@ object Routes {
     const val SignUpScreen = "signup"
     const val MatatuEstimateScreen = "clientHome"
     const val PasswordRecoveryScreen = "passwordRecovery"
-    const val OperatorHome = "operatorHome/{operatorId}"
-    const val RegistrationScreen = "registration_screen/{operatorId}?fleetId={fleetId}"
+    const val OperatorHome = "operatorHomeScreen/{operatorId}"
+    const val RegistrationScreen = "RegistrationScreen/{operatorId}"
     const val ChooseFleetDialog = "chooseFleet/{operatorId}"
     const val FleetRegistrationScreen = "fleetRegistration/{operatorId}"
     const val FleetDetailsScreen = "fleetDetails/{fleetId}"
@@ -29,12 +28,22 @@ object Routes {
     const val MatatuDetailsScreen = "matatuDetails/{matatuId}"
     const val FareDetailsScreen = "fareDetails/{matatuId}"
     const val QRScannerScreen = "qrScanner"
-    const val PaymentScreen = "paymentScreen/{scannedData}"
     const val FareTabbedScreen = "fare_tabbed_screen/{matatuId}"
     const val FleetAndFareTabs = "fleetAndFare/{fleetId}"
     const val SetFaresScreen = "setFares/{matatuId}"
     const val FareDisplayScreen = "fareDisplay/{matatuId}"
     const val PaymentPage = "paymentPage/{scannedQRCode}"
+    fun paymentPageWithQRCode(scannedQRCode: String): String {
+        return "paymentPage/$scannedQRCode"
+    }
+    fun registrationScreenRoute(operatorId: String, fleetId: String = ""): String {
+        return "registration_screen/$operatorId?fleetId=$fleetId"
+    }
+    fun operatorHomeRoute(operatorId: String): String {
+        return "operatorHomeScreen/$operatorId"
+    }
+
+
 }
 
 @Composable
@@ -68,9 +77,14 @@ fun AppNavigation(
                 backStackEntry -> SettingsScreen(navController, backStackEntry.arguments?.getString("userId") ?: "")
         }
 
-        composable(Routes.OperatorHome, arguments = listOf(navArgument("operatorId") { type = NavType.StringType })) {
-                backStackEntry -> OperatorHomeScreen(navController, backStackEntry.arguments?.getString("operatorId") ?: "")
+        composable(
+            route = "operatorHomeScreen/{operatorId}",
+            arguments = listOf(navArgument("operatorId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val operatorId = backStackEntry.arguments?.getString("operatorId")
+            OperatorHomeScreen(navController, operatorId = operatorId ?: "")
         }
+
 
         composable(Routes.FleetRegistrationScreen, arguments = listOf(navArgument("operatorId") { type = NavType.StringType })) {
                 backStackEntry -> FleetRegistrationScreen(navController, backStackEntry.arguments?.getString("operatorId") ?: "")
@@ -100,9 +114,34 @@ fun AppNavigation(
             val fleetId = backStackEntry.arguments?.getString("fleetId") ?: ""
             FleetAndFareTabs(navController, fleetId)
         }
-
+        composable(
+            Routes.PaymentPage,
+            arguments = listOf(navArgument("scannedQRCode") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val scannedQRCode = backStackEntry.arguments?.getString("scannedQRCode") ?: ""
+            PaymentPage(
+                navController = navController,
+                scannedQRCode = scannedQRCode,
+                fareManager = fareManager,
+                weatherManager = weatherManager,
+                timeManager = timeManager,
+                getMatatuIdFromRegistration = { regNo, callback ->
+                    fareManager.getMatatuIdFromRegistration(regNo, callback)
+                },
+                onPaymentSuccess = { /* handle payment success */ }
+            )
+        }
+        composable(Routes.QRScannerScreen) {
+            QRScannerScreen(
+                navController = navController,
+                onScanSuccess = { scannedData ->
+                    navController.navigate(Routes.paymentPageWithQRCode(scannedData))
+                }
+            )
+        }
         composable(Routes.FareDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) {
                 backStackEntry -> FareDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
         }
+
     }
 }

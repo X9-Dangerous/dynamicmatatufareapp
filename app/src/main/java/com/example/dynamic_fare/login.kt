@@ -1,6 +1,7 @@
 package com.example.dynamic_fare
 
 import android.app.Activity
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -195,10 +196,12 @@ fun navigateByRole(navController: NavController, role: String?) {
         db.get().addOnSuccessListener { snapshot ->
             val operatorId = snapshot.value as? String
             if (!operatorId.isNullOrEmpty()) {
-                navController.navigate(Routes.OperatorHome)
+                Log.d("LoginScreen", "Successfully retrieved operatorId: $operatorId")
+                navController.navigate("${Routes.OperatorHome}?operatorId=$operatorId")
                 {
                     popUpTo(Routes.LoginScreenContent) { inclusive = true }
                 }
+                Log.d("LoginScreen", "Navigating to OperatorHome with operatorId: $operatorId")
             } else {
                 Toast.makeText(navController.context, "Operator ID not found!", Toast.LENGTH_SHORT).show()
             }
@@ -214,4 +217,3 @@ fun navigateByRole(navController: NavController, role: String?) {
         }
     }
 }
-

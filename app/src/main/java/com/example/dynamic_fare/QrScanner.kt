@@ -61,7 +61,7 @@ fun QRScannerScreen(navController: NavController, onScanSuccess: (String) -> Uni
                         processImage(imageProxy) { result ->
                             scannedData = result
                             onScanSuccess(result)
-                            navController.navigate(Routes.PaymentPage)
+                            navController.navigate(Routes.paymentPageWithQRCode(result))
                         }
                     }
                 }

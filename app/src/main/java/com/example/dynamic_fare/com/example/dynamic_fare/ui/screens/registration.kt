@@ -33,6 +33,7 @@ import android.content.ContentValues
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
@@ -62,6 +63,10 @@ fun saveQRCodeToStorage(context: Context, bitmap: Bitmap) {
 
 @Composable
 fun RegistrationScreen(navController: NavController, operatorId: String) {
+    val context = LocalContext.current
+    val intent = (context as? android.app.Activity)?.intent
+    Log.d("RegistrationScreen", "operatorId received: $operatorId")
+    val operatorId = intent?.getStringExtra("operatorId") ?: operatorId
     var regNumber by remember { mutableStateOf("") }
     var routeStart by remember { mutableStateOf("") }
     var routeEnd by remember { mutableStateOf("") }
@@ -76,7 +81,7 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var errorMessage by remember { mutableStateOf("") }
 
-    val context = LocalContext.current
+
     val keyboardController = LocalSoftwareKeyboardController.current
     val coroutineScope = rememberCoroutineScope()
 

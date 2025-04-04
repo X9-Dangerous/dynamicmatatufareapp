@@ -34,8 +34,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Fix: Correct SetFaresActivity path -->
+
         <activity android:name="com.example.dynamic_fare.SetFaresActivity" />
+        <activity android:name="com.example.dynamic_fare.ui.screens.FareTabbedActivity" />
+
 
     </application>
 

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import android.util.Log
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -33,15 +34,25 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
     var isLoadingFleets by remember { mutableStateOf(true) }
     val currentRoute = navController.currentDestination?.route ?: ""
 
+
+    LaunchedEffect(operatorId) {
+        Log.d("OperatorHomeScreen", "Initializing OperatorHomeScreen")
+        Log.d("OperatorHomeScreen", "Received operatorId: $operatorId")
+    }
+
     // Fetch data before the screen is rendered
     LaunchedEffect(Unit) {
+        Log.d("OperatorHomeScreen", "Starting data fetch for operatorId: $operatorId")
+        
         MatatuRepository.fetchMatatusForOperator(operatorId) { matatus ->
+            Log.d("OperatorHomeScreen", "Fetched ${matatus.size} matatus for operator: $operatorId")
             matatuList.clear()
             matatuList.addAll(matatus)
             isLoadingMatatus = false
         }
 
         FleetRepository.fetchFleetsForOperator(operatorId) { fleets ->
+            Log.d("OperatorHomeScreen", "Fetched ${fleets.size} fleets for operator: $operatorId")
             fleetList.clear()
             fleetList.addAll(fleets)
             isLoadingFleets = false
@@ -53,7 +64,14 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    val route = if (selectedTab == 0) Routes.RegistrationScreen else Routes.FleetRegistrationScreen
+                    val route = if (selectedTab == 0) {
+                        Routes.registrationScreenRoute(operatorId)  // Here we pass operatorId only
+                    } else {
+                        "${Routes.FleetRegistrationScreen}/$operatorId"
+                    }
+
+                    Log.d("Navigation", "Navigating to: $route with operatorId: $operatorId")
+
                     navController.navigate(route)
                 }
             ) {

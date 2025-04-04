@@ -67,12 +67,14 @@ class MainActivity : ComponentActivity() {
                     composable(Routes.LoginScreenContent) { LoginScreenContent(navController) }
                     composable(Routes.SignUpScreen) { SignUpScreen(navController, signUpViewModel) }
 
-                    composable(Routes.OperatorHome, arguments = listOf(
-                        navArgument("operatorId") { type = NavType.StringType }
-                    )) { backStackEntry ->
-                        val id = backStackEntry.arguments?.getString("operatorId") ?: ""
-                        OperatorHomeScreen(navController, id)
+                    composable(
+                        route = "operatorHomeScreen/{operatorId}",
+                        arguments = listOf(navArgument("operatorId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val operatorId = backStackEntry.arguments?.getString("operatorId")
+                        OperatorHomeScreen(navController, operatorId = operatorId ?: "")
                     }
+
                     composable(Routes.MatatuDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) {
                             backStackEntry -> MatatuDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
                     }
@@ -138,10 +140,15 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable(Routes.QRScannerScreen) {
-                        QRScannerScreen(navController) { scannedData ->
-                            navController.navigate(Routes.PaymentScreen.replace("{scannedData}", scannedData))
-                        }
+                        QRScannerScreen(
+                            navController = navController,
+                            onScanSuccess = { scannedData ->
+                                // Navigate to PaymentPage using the scanned data
+                                navController.navigate(Routes.paymentPageWithQRCode(scannedData))
+                            }
+                        )
                     }
+
                 }
             }
         }

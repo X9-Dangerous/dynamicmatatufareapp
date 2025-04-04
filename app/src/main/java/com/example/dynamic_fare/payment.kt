@@ -24,7 +24,7 @@ fun PaymentPage(
     fareManager: FareManager,
     weatherManager: WeatherManager,
     timeManager: TimeManager,
-    getMatatuIdFromRegistration: (String, (String?) -> Unit) -> Unit,  // Use the passed function here
+    getMatatuIdFromRegistration: (String, (String?) -> Unit) -> Unit,
     onPaymentSuccess: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -47,8 +47,8 @@ fun PaymentPage(
         }
     }
 
-    // Fetch Fare details based on scanned QR code and operatorId
-    LaunchedEffect(scannedQRCode) {
+    // Fetch Fare details based on registration number
+    LaunchedEffect(registrationNumber) {
         if (registrationNumber != null) {
             val matatuRegNo = registrationNumber!!
             getMatatuIdFromRegistration(matatuRegNo) { matatuId ->
