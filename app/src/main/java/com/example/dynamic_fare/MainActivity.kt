@@ -142,6 +142,10 @@ class MainActivity : ComponentActivity() {
                             navController.navigate(Routes.PaymentScreen.replace("{scannedQRCode}", scannedData))
                         }
                     }
+                    
+                    composable(Routes.ClientProfile) {
+                        ClientProfileScreen(navController)
+                    }
                     composable(
                         Routes.PaymentPage,
                         arguments = listOf(navArgument("scannedQRCode") { type = NavType.StringType })

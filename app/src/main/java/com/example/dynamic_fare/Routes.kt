@@ -18,6 +18,7 @@ object Routes {
     const val SignUpScreen = "signup"
     const val MatatuEstimateScreen = "clientHome"
     const val PasswordRecoveryScreen = "passwordRecovery"
+    const val ClientProfile = "clientProfile"
     const val OperatorHome = "operatorHome/{operatorId}"
     const val RegistrationScreen = "registration_screen/{operatorId}?fleetId={fleetId}"
     const val ChooseFleetDialog = "chooseFleet/{operatorId}"
