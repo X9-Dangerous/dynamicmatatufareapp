@@ -1,0 +1,31 @@
+stop_id,stop_code,stop_name,stop_lat,stop_lon,location_type,parent_station,wheelchair_boarding
+1,CBD1,Nairobi Central Station,-1.286389,36.817223,0,,1
+2,WTL2,Westlands Terminal,-1.267788,36.803458,0,,1
+3,KYL3,Kayole Stop,-1.279465,36.908329,0,,1
+4,KBR4,Kibera Station,-1.311866,36.780031,0,,1
+5,KRN5,Karen Terminal,-1.319363,36.706510,0,,1
+6,RNG6,Rongai Stop,-1.396967,36.754679,0,,1
+7,NGR7,Ngong Road Station,-1.299040,36.764802,0,,1
+8,CBD8,CBD Main Stop,-1.284756,36.824061,0,,1
+9,EST9,Eastleigh Terminal,-1.274872,36.851430,0,,1
+10,TRM10,Thika Road Mall,-1.219692,36.888138,0,,1
+11,JJA11,Juja Road Stop,-1.259800,36.862700,0,,1
+12,UTS12,Utawala Station,-1.293600,37.011900,0,,1
+13,RSL13,Ruiru Stop,-1.145300,36.958900,0,,1
+14,ATR14,Athi River Terminal,-1.447200,36.979300,0,,1
+15,DND15,Dandora Stop,-1.251300,36.893900,0,,1
+16,KGW16,Kangemi Terminal,-1.264100,36.747500,0,,1
+17,DSP17,Dagoretti South Plaza,-1.291900,36.707700,0,,1
+18,LGT18,Langata Road Terminal,-1.325100,36.762700,0,,1
+19,KSN19,Kasarani Station,-1.220600,36.893400,0,,1
+20,MBS20,Mbagathi Way Stop,-1.307200,36.805500,0,,1
+21,RDG21,Ridgeways Terminal,-1.233700,36.847500,0,,1
+22,ISL22,Industrial Area Landies,-1.308000,36.845200,0,,1
+23,CHK23,Kahawa West Station,-1.187700,36.921600,0,,1
+24,SDM24,South B/C Main Stop,-1.314900,36.842900,0,,1
+25,BRL25,Buruburu Junction,-1.285600,36.876900,0,,1
+26,MTH26,Mathare North Stop,-1.249800,36.873900,0,,1
+27,DGR27,Dagoretti Corner,-1.282900,36.733100,0,,1
+28,EJJ28,Eastleigh-Juja Junction,-1.268600,36.858600,0,,1
+29,NHL29,Nairobi Hill Terminal,-1.293500,36.795200,0,,1
+30,MGB30,Muguga Green Hub,-1.268200,36.763400,0,,1
