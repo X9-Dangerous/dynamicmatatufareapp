@@ -152,17 +152,15 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-                    composable(Routes.ClientProfile) {
-                        ClientProfileScreen(navController)
-                    }
+
 
 
                 }
             }
-        }
-    }
+
+
 
     private fun getMatatuIdFromRegistration(registration: String) {
 
     }
-}
+

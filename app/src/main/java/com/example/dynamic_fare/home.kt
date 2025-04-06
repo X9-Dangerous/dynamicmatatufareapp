@@ -18,6 +18,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.text.font.FontWeight as ComposeTextFontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.LocationOn
@@ -37,7 +43,6 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.location.*
-import com.google.android.gms.location.LocationServices
 import okhttp3.*
 import org.json.JSONObject
 import org.osmdroid.config.Configuration
@@ -63,6 +68,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var directLine by remember { mutableStateOf<List<GeoPoint>?>(null) }
+    var mapView by remember { mutableStateOf<MapView?>(null) }
 
     // Auto-suggestion states
     var startingSuggestions by remember { mutableStateOf<List<GtfsStopSuggestion>>(emptyList()) }
@@ -104,9 +110,15 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
         isLoading = true
         errorMessage = null
 
-        // Add direct line first as fallback
-        routePoints = listOf(start, end)
+        // Set up direct line as fallback
         directLine = listOf(start, end)
+        
+        // Note: We're not initializing routePoints here anymore
+        // to ensure we don't override the API response points
+        // with just start and end
+        
+        // Log attempt to fetch route
+        Log.d("ROUTE_FETCH_DETAIL", "Attempting to fetch route with ${start.latitude},${start.longitude} -> ${end.latitude},${end.longitude}")
 
         // Calculate direct distance as fallback
         val directDistanceInMeters = calculateDistance(start.latitude, start.longitude, end.latitude, end.longitude)
@@ -131,7 +143,13 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                     isLoading = false
                     errorMessage = "Using direct route (API timeout)"
                     Toast.makeText(context, "Using direct line between points", Toast.LENGTH_SHORT).show()
-                    // We still have the direct line as fallback - no need to do anything else
+                    
+                    // Set routePoints to directLine as fallback
+                    routePoints = directLine ?: listOf(start, end)
+                    
+                    // No need to force map redraw here, it will redraw on its own in the update function
+                    
+                    Log.d("ROUTE_FALLBACK", "Using direct route as fallback due to API error")
                 }
             }
 
@@ -190,13 +208,24 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
 
                                 // Update UI on the main thread
                                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    routePoints = points
+                                    if (points.size > 2) {
+                                        Log.d("ROUTE_POINTS", "Setting ${points.size} route points from API response")
+                                        routePoints = points
+                                        // No need to force map redraw here, it will redraw on its own in the update function
+                                    } else {
+                                        Log.w("ROUTE_POINTS", "API returned too few points (${points.size}), using direct line")
+                                        // Fall back to direct line if not enough points
+                                        routePoints = directLine ?: listOf(start, end)
+                                    }
+                                    
                                     routeDistance = distanceInMeters / 1000 // Convert to kilometers
                                     routeDuration = durationInSeconds / 60 // Convert to minutes
                                     routeDirections = directions
                                     isLoading = false
-                                    Log.d("ROUTE_POINTS", "Set ${points.size} route points")
                                     Log.d("ROUTE_INFO", "Distance: ${distanceInMeters/1000} km, Duration: ${durationInSeconds/60} min")
+                                    
+                                    // Show a success toast
+                                    Toast.makeText(context, "Route loaded successfully", Toast.LENGTH_SHORT).show()
                                 }
                             } else {
                                 Log.e("ROUTE_ERROR", "No geometry or coordinates found in route")
@@ -395,7 +424,8 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
         Spacer(modifier = Modifier.height(20.dp))
 
         // Map
-        var mapView by remember { mutableStateOf<MapView?>(null) }
+
+        // Distance and time now appears as an overlay on the bottom left of the map
 
         Card(
             modifier = Modifier
@@ -488,18 +518,25 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
 
                     // Draw the route on the map
                     val routePoints = routePoints
-                    if (routePoints.isNotEmpty()) {
+                    if (routePoints.isNotEmpty() && routePoints.size > 1) {
                         Log.d("MAP_ROUTE", "Drawing route with ${routePoints.size} points")
 
                         try {
                             // Create a new polyline
                             val polyline = Polyline()
                             polyline.setPoints(routePoints)
+                            Log.d("POLYLINE_DEBUG", "Polyline has ${routePoints.size} points")
                             polyline.outlinePaint.color = AndroidColor.BLUE
                             polyline.outlinePaint.strokeWidth = 10f
 
                             // Add it to the map
                             mapView.overlays.add(polyline)
+                            mapView.invalidate()
+
+                            // Log the successful polyline addition
+                            val firstPoint = if (routePoints.isNotEmpty()) routePoints.first() else null
+                            val lastPoint = if (routePoints.size > 1) routePoints.last() else null
+                            Log.d("POLYLINE_SUCCESS", "Successfully added polyline from ${firstPoint?.latitude},${firstPoint?.longitude} to ${lastPoint?.latitude},${lastPoint?.longitude}")
 
                             Log.d("MAP_ROUTE", "Added polyline to map overlays")
                         } catch (e: Exception) {
@@ -527,55 +564,10 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                         Log.d("MAP_ROUTE", "Using direct line as fallback")
                         try {
                             // Draw a simple direct line between start and end
-                            val simpleLine = Polyline()
+                            val simpleLine = Polyline(mapView)
                             for (point in directLine!!) {
                                 simpleLine.addPoint(point)
                             }
-                            simpleLine.outlinePaint.color = AndroidColor.BLUE
-                            simpleLine.outlinePaint.strokeWidth = 10f
-                            mapView.overlays.add(simpleLine)
-                            Log.d("MAP_ROUTE", "Added direct line between points")
-                        } catch (e: Exception) {
-                            Log.e("MAP_ROUTE", "Failed with direct line approach", e)
-
-                            // Last resort approach
-                            if (startingLocation != null && destinationLocation != null) {
-                                try {
-                                    // Create path with Paint directly
-                                    val pathOverlay = object : org.osmdroid.views.overlay.Overlay() {
-                                        override fun draw(canvas: android.graphics.Canvas, mapView: MapView, shadow: Boolean) {
-                                            val startPoint = mapView.projection.toPixels(startingLocation, null)
-                                            val endPoint = mapView.projection.toPixels(destinationLocation, null)
-
-                                            val paint = android.graphics.Paint().apply {
-                                                color = AndroidColor.BLUE
-                                                strokeWidth = 10f
-                                                style = android.graphics.Paint.Style.STROKE
-                                            }
-
-                                            val path = android.graphics.Path().apply {
-                                                moveTo(startPoint.x.toFloat(), startPoint.y.toFloat())
-                                                lineTo(endPoint.x.toFloat(), endPoint.y.toFloat())
-                                            }
-
-                                            canvas.drawPath(path, paint)
-                                        }
-                                    }
-
-                                    mapView.overlays.add(pathOverlay)
-                                    Log.d("MAP_ROUTE", "Added custom path overlay")
-                                } catch (e: Exception) {
-                                    Log.e("MAP_ROUTE", "Failed with all route drawing approaches", e)
-                                }
-                            }
-                        }
-                    } else if (startingLocation != null && destinationLocation != null) {
-                        // Extra fallback if somehow we have locations but no directLine
-                        Log.d("MAP_ROUTE", "Using locations directly for line")
-                        try {
-                            val simpleLine = Polyline()
-                            simpleLine.addPoint(startingLocation)
-                            simpleLine.addPoint(destinationLocation)
                             simpleLine.outlinePaint.color = AndroidColor.BLUE
                             simpleLine.outlinePaint.strokeWidth = 10f
                             mapView.overlays.add(simpleLine)
@@ -585,108 +577,138 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                         }
                     }
 
-                    // Add route information overlay if we have distance data
-                    if (routeDistance != null) {
-                        try {
-                            // Create an info panel overlay
-                            val infoOverlay = object : org.osmdroid.views.overlay.Overlay() {
-                                override fun draw(canvas: android.graphics.Canvas, mapView: MapView, shadow: Boolean) {
-                                    if (shadow) return
-
-                                    // Create paints
-                                    val bgPaint = android.graphics.Paint().apply {
-                                        color = android.graphics.Color.argb(220, 255, 255, 255) // Semi-transparent white
-                                        style = android.graphics.Paint.Style.FILL
+                    // Add distance and time info overlay at bottom left of the map
+                    mapView?.let { mapViewInstance ->
+                        val distance = routeDistance
+                        val duration = routeDuration
+                        
+                        if (startingLocation != null && destinationLocation != null && distance != null) {
+                            try {
+                                // Create an overlay for the bottom left corner
+                                val infoOverlay = object : org.osmdroid.views.overlay.Overlay() {
+                                    override fun draw(canvas: android.graphics.Canvas, mapView: MapView, shadow: Boolean) {
+                                        if (shadow) return
+                                        
+                                        try {
+                                            // Create background paint
+                                            val bgPaint = android.graphics.Paint().apply {
+                                                color = android.graphics.Color.argb(220, 25, 118, 210) // Semi-transparent blue
+                                                style = android.graphics.Paint.Style.FILL
+                                            }
+                                            
+                                            val borderPaint = android.graphics.Paint().apply {
+                                                color = android.graphics.Color.WHITE
+                                                style = android.graphics.Paint.Style.STROKE
+                                                strokeWidth = 2f
+                                            }
+                                            
+                                            val textPaint = android.graphics.Paint().apply {
+                                                color = android.graphics.Color.WHITE
+                                                style = android.graphics.Paint.Style.FILL
+                                                textSize = 24f
+                                                isFakeBoldText = true
+                                            }
+                                            
+                                            val smallTextPaint = android.graphics.Paint().apply {
+                                                color = android.graphics.Color.WHITE
+                                                style = android.graphics.Paint.Style.FILL
+                                                textSize = 20f
+                                            }
+                                            
+                                            // Create text with labels
+                                            val distanceText = "Distance: ${DecimalFormat("#.#").format(distance)} km"
+                                            val timeText = if (duration != null) {
+                                                "Estimated Time: ${DecimalFormat("#.#").format(duration)} min"
+                                            } else {
+                                                ""
+                                            }
+                                            
+                                            // Measure text
+                                            val distanceBounds = android.graphics.Rect()
+                                            textPaint.getTextBounds(distanceText, 0, distanceText.length, distanceBounds)
+                                            
+                                            val timeBounds = android.graphics.Rect()
+                                            if (timeText.isNotEmpty()) {
+                                                smallTextPaint.getTextBounds(timeText, 0, timeText.length, timeBounds)
+                                            }
+                                            
+                                            // Calculate size and position
+                                            val padding = 16f
+                                            val margin = 20f
+                                            val spacing = 12f
+                                            
+                                            val boxWidth = Math.max(distanceBounds.width(), timeBounds.width()) + (padding * 2)
+                                            val boxHeight = distanceBounds.height() + (if (timeText.isNotEmpty()) timeBounds.height() + spacing else 0f) + (padding * 2)
+                                            
+                                            // Position at bottom left with margin
+                                            val rect = android.graphics.RectF(
+                                                margin,
+                                                mapView.height - boxHeight - margin,
+                                                margin + boxWidth,
+                                                mapView.height - margin
+                                            )
+                                            
+                                            // Draw rounded rectangle
+                                            canvas.drawRoundRect(rect, 12f, 12f, bgPaint)
+                                            canvas.drawRoundRect(rect, 12f, 12f, borderPaint)
+                                            
+                                            // Draw distance text
+                                            canvas.drawText(
+                                                distanceText,
+                                                rect.left + padding,
+                                                rect.top + padding + distanceBounds.height(),
+                                                textPaint
+                                            )
+                                            
+                                            // Draw time text if available
+                                            if (timeText.isNotEmpty()) {
+                                                canvas.drawText(
+                                                    timeText,
+                                                    rect.left + padding,
+                                                    rect.top + padding + distanceBounds.height() + spacing + timeBounds.height(),
+                                                    smallTextPaint
+                                                )
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e("MAP_INFO", "Error drawing info overlay: ${e.message}")
+                                        }
                                     }
-
-                                    val borderPaint = android.graphics.Paint().apply {
-                                        color = android.graphics.Color.BLACK
-                                        style = android.graphics.Paint.Style.STROKE
-                                        strokeWidth = 2f
-                                    }
-
-                                    val titlePaint = android.graphics.Paint().apply {
-                                        color = android.graphics.Color.BLACK
-                                        textSize = 32f
-                                        isFakeBoldText = true
-                                    }
-
-                                    val textPaint = android.graphics.Paint().apply {
-                                        color = android.graphics.Color.BLACK
-                                        textSize = 26f
-                                    }
-
-                                    // Calculate panel size
-                                    val width = canvas.width
-                                    val height = canvas.height
-
-                                    // Panel will be at bottom left with fixed width
-                                    val panelWidth = width * 0.4f
-                                    val panelHeight = 100f // Smaller panel without directions
-
-                                    // Position at bottom left with margins
-                                    val leftMargin = 20f
-                                    val bottomMargin = 20f
-
-                                    // Draw panel background
-                                    val rect = android.graphics.RectF(
-                                        leftMargin,
-                                        height - bottomMargin - panelHeight,
-                                        leftMargin + panelWidth,
-                                        height - bottomMargin
-                                    )
-                                    canvas.drawRoundRect(rect, 10f, 10f, bgPaint)
-                                    canvas.drawRoundRect(rect, 10f, 10f, borderPaint)
-
-                                    // Format distance and duration
-                                    val distanceText = "Distance: ${DecimalFormat("#.##").format(routeDistance)} km"
-                                    val timeText = "Time: ${DecimalFormat("#.#").format(routeDuration)} min"
-
-                                    // Draw distance on first line
-                                    canvas.drawText(
-                                        distanceText,
-                                        leftMargin + 10f,
-                                        height - bottomMargin - panelHeight + 35f,
-                                        textPaint
-                                    )
-
-                                    // Draw time on second line
-                                    canvas.drawText(
-                                        timeText,
-                                        leftMargin + 10f,
-                                        height - bottomMargin - panelHeight + 70f,
-                                        textPaint
-                                    )
                                 }
+                                
+                                // Add overlay to map
+                                mapViewInstance.overlays.add(infoOverlay)
+                                Log.d("MAP_INFO", "Added distance/time overlay to bottom left")
+                            } catch (e: Exception) {
+                                Log.e("MAP_INFO", "Error creating info overlay", e)
                             }
-
-                            // Add the info overlay (above all other overlays)
-                            mapView.overlays.add(infoOverlay)
-                            Log.d("MAP_INFO", "Added route information overlay to map")
-                        } catch (e: Exception) {
-                            Log.e("MAP_INFO", "Error adding information overlay", e)
                         }
                     }
-
-                    // If we have route points but no markers set, zoom to show the route
-                    if (startingLocation == null && destinationLocation == null && routePoints.size > 1) {
+                    // Handle map zooming based on available points
+                    mapView?.let { mapViewInstance ->
                         try {
-                            val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(routePoints)
-                            mapView.zoomToBoundingBox(boundingBox, true, 100)
+                            // Case 1: We have route points but no markers
+                            if (startingLocation == null && destinationLocation == null && routePoints.size > 1) {
+                                val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(routePoints)
+                                mapViewInstance.zoomToBoundingBox(boundingBox, true, 100)
+                                Log.d("MAP_ZOOM", "Zoomed to route points")
+                            } 
+                            // Case 2: We have direct line between points
+                            else if (directLine != null && directLine!!.size >= 2) {
+                                val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(directLine!!)
+                                mapViewInstance.zoomToBoundingBox(boundingBox, true, 100)
+                                Log.d("MAP_ZOOM", "Zoomed to direct line")
+                            }
+                            // Case 3: Default case - no zooming needed
+                            else {
+                                Log.d("MAP_ZOOM", "No points available for zooming")
+                            }
                         } catch (e: Exception) {
-                            Log.e("MAP_ERROR", "Error zooming to route bounding box", e)
-                        }
-                    } else if (directLine != null && directLine!!.size >= 2) {
-                        try {
-                            val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(directLine!!)
-                            mapView.zoomToBoundingBox(boundingBox, true, 100)
-                        } catch (e: Exception) {
-                            Log.e("MAP_ERROR", "Error zooming to direct line bounding box", e)
+                            Log.e("MAP_ERROR", "Error zooming map to bounds", e)
                         }
                     }
 
                     // Force refresh the map
-                    mapView.invalidate()
+                    mapView?.invalidate()
                 }, modifier = Modifier.fillMaxSize())
             }
         }

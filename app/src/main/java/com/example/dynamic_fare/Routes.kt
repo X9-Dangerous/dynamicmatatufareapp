@@ -5,7 +5,6 @@ import androidx.navigation.*
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.dynamic_fare.Routes.PaymentScreen
 import com.example.dynamic_fare.ui.*
 import com.example.dynamic_fare.ui.screens.*
 import com.example.dynamic_fare.ui.screens.RegistrationScreen
