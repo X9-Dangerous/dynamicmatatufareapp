@@ -81,6 +81,17 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
     var routeDistance by remember { mutableStateOf<Double?>(null) }
     var routeDuration by remember { mutableStateOf<Double?>(null) }
     var routeDirections by remember { mutableStateOf<List<String>>(emptyList()) }
+    
+    // Preload GTFS data when the screen is first shown
+    LaunchedEffect(Unit) {
+        try {
+            Log.d("GTFS_DEBUG", "Preloading GTFS data from stops1.txt on screen launch")
+            val stops = getGtfsStopsFromFile(context)
+            Log.d("GTFS_DEBUG", "Preloaded ${stops.size} GTFS stops successfully")
+        } catch (e: Exception) {
+            Log.e("GTFS_DEBUG", "Error preloading GTFS data: ${e.message}", e)
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -289,8 +300,10 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                 startDestination = it
                 // Get GTFS suggestions when text changes
                 if (it.length >= 2) {
+                    Log.d("GTFS_UI", "Getting suggestions for starting point: '$it'")
                     startingSuggestions = getGtfsStopSuggestions(it, context)
                     showStartingSuggestions = startingSuggestions.isNotEmpty()
+                    Log.d("GTFS_UI", "Got ${startingSuggestions.size} suggestions, showing=${showStartingSuggestions}")
                 } else {
                     startingSuggestions = emptyList()
                     showStartingSuggestions = false
@@ -316,8 +329,10 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                 destination = it
                 // Get GTFS suggestions when text changes
                 if (it.length >= 2) {
+                    Log.d("GTFS_UI", "Getting suggestions for destination: '$it'")
                     destinationSuggestions = getGtfsStopSuggestions(it, context)
                     showDestinationSuggestions = destinationSuggestions.isNotEmpty()
+                    Log.d("GTFS_UI", "Got ${destinationSuggestions.size} suggestions, showing=${showDestinationSuggestions}")
                 } else {
                     destinationSuggestions = emptyList()
                     showDestinationSuggestions = false
@@ -872,6 +887,7 @@ fun GtfsInputField(
 
             // Show suggestions dropdown
             if (showSuggestions) {
+                Log.d("GTFS_UI", "Showing dropdown with ${suggestions.size} suggestions")
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -920,33 +936,53 @@ fun GtfsInputField(
 fun getGtfsStopSuggestions(input: String, context: Context): List<GtfsStopSuggestion> {
     if (input.isEmpty() || input.length < 2) return emptyList()
 
+    Log.d("GTFS_DEBUG", "Searching for suggestions with input: '$input'")
+
     try {
         // Get all GTFS stops from the stops.txt file
         val gtfsStops = getGtfsStopsFromFile(context)
+        Log.d("GTFS_DEBUG", "Got ${gtfsStops.size} total stops from file")
 
         // Filter the stops based on user input
-        return gtfsStops.filter {
+        val filteredStops = gtfsStops.filter {
             it.stopName.contains(input, ignoreCase = true) ||
                     it.stopCode.contains(input, ignoreCase = true)
         }.take(15) // Limit results to prevent overwhelming the UI
+
+        Log.d("GTFS_DEBUG", "Filtered to ${filteredStops.size} matching stops")
+        if (filteredStops.isNotEmpty()) {
+            Log.d("GTFS_DEBUG", "First match: ${filteredStops.first().stopName}")
+        }
+
+        return filteredStops
     } catch (e: Exception) {
-        Log.e("GTFS", "Error getting stop suggestions: ${e.message}")
+        Log.e("GTFS_DEBUG", "Error getting stop suggestions: ${e.message}", e)
         // Fallback to sample data in case of error
-        return getSampleStops().filter {
+        Log.d("GTFS_DEBUG", "Using fallback sample data")
+        val fallbackStops = getSampleStops().filter {
             it.stopName.contains(input, ignoreCase = true) ||
                     it.stopCode.contains(input, ignoreCase = true)
         }
+        Log.d("GTFS_DEBUG", "Found ${fallbackStops.size} fallback matches")
+        return fallbackStops
     }
 }
 
 // Helper function to read GTFS stops from the stops.txt file
-private fun getGtfsStopsFromFile(context: Context): List<GtfsStopSuggestion> {
+fun getGtfsStopsFromFile(context: Context): List<GtfsStopSuggestion> {
     val stops = mutableListOf<GtfsStopSuggestion>()
 
+    // Try opening from gtfs subfolder first
     try {
-        context.assets.open("stops.txt").bufferedReader().use { reader ->
+        Log.d("GTFS_DEBUG", "Attempting to open gtfs/stops1.txt")
+        context.assets.open("gtfs/stops1.txt").bufferedReader().use { reader ->
             // Read all lines
             val lines = reader.readLines()
+            Log.d("GTFS_DEBUG", "Read ${lines.size} lines from stops.txt")
+
+            if (lines.isNotEmpty()) {
+                Log.d("GTFS_DEBUG", "Header: ${lines.first()}")
+            }
 
             // Skip header and process all data lines
             lines.drop(1).forEach { line ->
@@ -972,23 +1008,79 @@ private fun getGtfsStopsFromFile(context: Context): List<GtfsStopSuggestion> {
                             )
                         }
                     } catch (e: Exception) {
-                        Log.e("GTFS", "Error parsing stop line: $line", e)
+                        Log.e("GTFS_DEBUG", "Error parsing stop line: $line", e)
                         // Continue to next line on error
                     }
                 }
             }
         }
 
-        Log.d("GTFS", "Loaded ${stops.size} stops from GTFS data")
+        Log.d("GTFS_DEBUG", "Successfully loaded ${stops.size} stops from GTFS data")
+        if (stops.size > 0) {
+            Log.d("GTFS_DEBUG", "Sample stop: ${stops.first()}")
+        }
     } catch (e: Exception) {
-        Log.e("GTFS", "Error reading stops.txt file", e)
+        Log.e("GTFS_DEBUG", "Error reading stops.txt file from gtfs folder: ${e.message}", e)
     }
 
+    // If we got no stops, try to read from the root assets folder as a fallback
+    if (stops.isEmpty()) {
+        try {
+            Log.d("GTFS_DEBUG", "Trying to open stops1.txt from root assets folder")
+            context.assets.open("stops1.txt").bufferedReader().use { fileReader ->
+                // Read all lines
+                val lines = fileReader.readLines()
+                Log.d("GTFS_DEBUG", "Read ${lines.size} lines from stops.txt in root")
+
+                // Skip header and process all data lines
+                if (lines.isNotEmpty()) {
+                    lines.drop(1).forEach { fileLine ->
+                        val parts = fileLine.split(",")
+                        if (parts.size >= 5) {
+                            try {
+                                val stopId = parts[0].trim()
+                                val stopCode = parts[1].trim().ifEmpty { stopId } 
+                                val stopName = parts[2].trim()
+                                val stopLat = parts[3].trim().toDoubleOrNull() ?: 0.0
+                                val stopLon = parts[4].trim().toDoubleOrNull() ?: 0.0
+
+                                if (stopName.isNotEmpty() && stopLat != 0.0 && stopLon != 0.0) {
+                                    stops.add(
+                                        GtfsStopSuggestion(
+                                            stopId = stopId,
+                                            stopName = stopName,
+                                            stopCode = stopCode,
+                                            latitude = stopLat,
+                                            longitude = stopLon
+                                        )
+                                    )
+                                }
+                            } catch (e2: Exception) {
+                                Log.e("GTFS_DEBUG", "Error parsing stop line from root: $fileLine", e2)
+                            }
+                        }
+                    }
+                }
+
+                Log.d("GTFS_DEBUG", "Loaded ${stops.size} stops from root assets folder")
+            }
+        } catch (e2: Exception) {
+            Log.e("GTFS_DEBUG", "Error reading stops.txt from root folder: ${e2.message}", e2)
+            Log.e("GTFS_DEBUG", "Stack trace: ${e2.stackTraceToString()}")
+        }
+    }
+
+    // If we got no stops, try the fallback locations
+    if (stops.isEmpty()) {
+        Log.d("GTFS_DEBUG", "No stops loaded from file, using sample stops as fallback")
+        return getSampleStops()
+    }
+    
     return stops
 }
 
 // Fallback sample stops in case file reading fails
-private fun getSampleStops(): List<GtfsStopSuggestion> {
+fun getSampleStops(): List<GtfsStopSuggestion> {
     return listOf(
         GtfsStopSuggestion("1", "Nairobi Central Station", "NCS1", -1.286389, 36.817223),
         GtfsStopSuggestion("2", "Westlands Terminal", "WT2", -1.267788, 36.803458),
@@ -1004,7 +1096,7 @@ private fun getSampleStops(): List<GtfsStopSuggestion> {
 }
 
 // Helper function to calculate distance between two points using Haversine formula
-fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+public fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6371e3 // Earth radius in meters
     val φ1 = lat1 * Math.PI / 180
     val φ2 = lat2 * Math.PI / 180
