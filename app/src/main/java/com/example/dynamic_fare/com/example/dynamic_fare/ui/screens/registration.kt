@@ -64,38 +64,51 @@ data class GtfsStopSuggestion(
 fun getGtfsStopSuggestions(input: String, context: Context): List<GtfsStopSuggestion> {
     if (input.isEmpty() || input.length < 2) return emptyList()
 
-    try {
-        // Get all GTFS stops from the stops.txt file
-        val gtfsStops = getGtfsStopsFromFile(context)
+    Log.d("GTFS_DEBUG", "Searching for suggestions with input: '$input'")
 
-        Log.d("GTFS", "Found ${gtfsStops.size} stops for filtering with input: $input")
+    try {
+        // Get all GTFS stops from the stops1.txt file
+        val gtfsStops = getGtfsStopsFromFile(context)
+        Log.d("GTFS_DEBUG", "Got ${gtfsStops.size} total stops from file")
 
         // Filter the stops based on user input
-        return gtfsStops.filter {
+        val filteredStops = gtfsStops.filter {
             it.stopName.contains(input, ignoreCase = true) ||
                     it.stopCode.contains(input, ignoreCase = true)
         }.take(15) // Limit results to prevent overwhelming the UI
+
+        Log.d("GTFS_DEBUG", "Filtered to ${filteredStops.size} matching stops")
+        if (filteredStops.isNotEmpty()) {
+            Log.d("GTFS_DEBUG", "First match: ${filteredStops.first().stopName}")
+        }
+
+        return filteredStops
     } catch (e: Exception) {
-        Log.e("GTFS", "Error getting stop suggestions: ${e.message}", e)
+        Log.e("GTFS_DEBUG", "Error getting stop suggestions: ${e.message}", e)
         // Fallback to sample data in case of error
-        return getSampleStops().filter {
+        Log.d("GTFS_DEBUG", "Using fallback sample data")
+        val fallbackStops = getSampleStops().filter {
             it.stopName.contains(input, ignoreCase = true) ||
                     it.stopCode.contains(input, ignoreCase = true)
         }
+        Log.d("GTFS_DEBUG", "Found ${fallbackStops.size} fallback matches")
+        return fallbackStops
     }
+
 }
 
-// Helper function to read GTFS stops from the stops.txt file
+// Helper function to read GTFS stops from the stops1.txt file
 private fun getGtfsStopsFromFile(context: Context): List<GtfsStopSuggestion> {
     val stops = mutableListOf<GtfsStopSuggestion>()
 
     try {
-        // Try to open the file directly from assets root folder
-        context.assets.open("stops.txt").bufferedReader().use { reader ->
+        // Try opening from gtfs subfolder first
+        Log.d("GTFS_DEBUG", "Attempting to open gtfs/stops1.txt")
+        context.assets.open("gtfs/stops1.txt").bufferedReader().use { reader ->
             // Read all lines
             val lines = reader.readLines()
 
-            Log.d("GTFS", "Found ${lines.size} lines in stops.txt")
+            Log.d("GTFS_DEBUG", "Found ${lines.size} lines in stops1.txt")
 
             // Skip header and process all data lines
             if (lines.isNotEmpty()) {
