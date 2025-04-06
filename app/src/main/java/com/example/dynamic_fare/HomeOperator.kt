@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,17 +37,25 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
     var isLoadingFleets by remember { mutableStateOf(true) }
 
     LaunchedEffect(operatorId) {
-        Log.d("OperatorHomeScreen", "Loading data for operatorId: $operatorId")
+        Log.d("OperatorHomeScreen", "Starting data load for operatorId: $operatorId")
+        if (operatorId.isBlank()) {
+            Log.e("OperatorHomeScreen", "Invalid operatorId: empty or blank")
+            return@LaunchedEffect
+        }
         
         // Load matatus
+        Log.d("OperatorHomeScreen", "Fetching matatus for operatorId: $operatorId")
         MatatuRepository.fetchMatatusForOperator(operatorId) { matatus ->
+            Log.d("OperatorHomeScreen", "Received ${matatus.size} matatus for operatorId: $operatorId")
             matatuList.clear()
             matatuList.addAll(matatus)
             isLoadingMatatus = false
         }
 
         // Load fleets
+        Log.d("OperatorHomeScreen", "Fetching fleets for operatorId: $operatorId")
         FleetRepository.fetchFleetsForOperator(operatorId) { fleets: List<Fleet> ->
+            Log.d("OperatorHomeScreen", "Received ${fleets.size} fleets for operatorId: $operatorId")
             fleetList.clear()
             fleetList.addAll(fleets)
             isLoadingFleets = false
@@ -165,9 +175,70 @@ fun MatatuDetailItem(matatu: Matatu, navController: NavController, operatorId: S
             },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "Registration: ${matatu.registrationNumber}", style = MaterialTheme.typography.bodyMedium)
-            Text(text = "Route: ${matatu.routeStart} → ${matatu.routeEnd}", style = MaterialTheme.typography.bodyMedium)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Matatu details
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Registration: ${matatu.registrationNumber}", style = MaterialTheme.typography.bodyMedium)
+                Text(text = "Route: ${matatu.routeStart} → ${matatu.routeEnd}", style = MaterialTheme.typography.bodyMedium)
+            }
+            
+            var showDeleteDialog by remember { mutableStateOf(false) }
+            val context = LocalContext.current
+
+            // Delete icon
+            IconButton(
+                onClick = { showDeleteDialog = true }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete Matatu",
+                    tint = Color.Red
+                )
+            }
+
+            // Delete confirmation dialog
+            if (showDeleteDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = false },
+                    title = { Text("Delete Matatu") },
+                    text = { Text("Are you sure you want to delete this matatu?") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showDeleteDialog = false
+                                MatatuRepository.deleteMatatu(matatu.matatuId) { success ->
+                                    if (success) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Matatu deleted successfully",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Failed to delete matatu",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+                        ) {
+                            Text("Delete", color = Color.Red)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
         }
     }
 }

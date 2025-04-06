@@ -482,7 +482,7 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
                         val endCoords = if (endLocationCoordinates != null)
                             "${endLocationCoordinates?.first},${endLocationCoordinates?.second}"
                         else ""
-                        val qrData = "$regNumber|$routeStart|$routeEnd|$startCoords|$endCoords|$mpesaType|$pochiNumber|$paybillNumber|$accountNumber|$tillNumber|$sendMoneyPhone"
+                        val qrData = "$regNumber"
                         val bitMatrix: BitMatrix = MultiFormatWriter().encode(qrData, BarcodeFormat.QR_CODE, 500, 500)
                         val barcodeEncoder = BarcodeEncoder()
                         qrBitmap = barcodeEncoder.createBitmap(bitMatrix)
@@ -541,7 +541,10 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
                     ) { success ->
                         if (success) {
                             Toast.makeText(context, "Matatu Registered Successfully!", Toast.LENGTH_LONG).show()
-                            navController.navigate(Routes.OperatorHome)
+                            navController.navigate(Routes.operatorHomeRoute(operatorId)) {
+                                // Clear the back stack up to the operator home
+                                popUpTo(Routes.OperatorHome) { inclusive = true }
+                            }
                         } else {
                             Toast.makeText(context, "Registration Failed!", Toast.LENGTH_LONG).show()
                         }

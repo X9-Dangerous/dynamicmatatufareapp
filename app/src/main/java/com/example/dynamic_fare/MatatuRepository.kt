@@ -102,13 +102,29 @@ object MatatuRepository {
             })
     }
 
-    // ✅ Delete a matatu
+    // ✅ Delete a matatu and its associated fare details
     fun deleteMatatu(matatuId: String, onComplete: (Boolean) -> Unit) {
-        database.child(matatuId)
-            .removeValue()
-            .addOnSuccessListener { onComplete(true) }
-            .addOnFailureListener {
-                Log.e("MatatuRepository", "Error deleting matatu", it)
+        Log.d("MatatuRepository", "Starting deletion process for matatuId: $matatuId")
+        
+        // Delete matatu details
+        database.child(matatuId).removeValue()
+            .addOnSuccessListener {
+                Log.d("MatatuRepository", "Successfully deleted matatu: $matatuId")
+                
+                // Also delete associated fare details
+                val faresRef = FirebaseDatabase.getInstance().reference.child("fares")
+                faresRef.child(matatuId).removeValue()
+                    .addOnSuccessListener {
+                        Log.d("MatatuRepository", "Successfully deleted fare details for matatu: $matatuId")
+                        onComplete(true)
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("MatatuRepository", "Error deleting fare details for matatu: $matatuId", e)
+                        onComplete(false)
+                    }
+            }
+            .addOnFailureListener { e ->
+                Log.e("MatatuRepository", "Error deleting matatu: $matatuId", e)
                 onComplete(false)
             }
     }

@@ -88,7 +88,7 @@ fun FooterWithIcons(navController: NavController) {
                     .clickable {
                         val userId = FirebaseAuth.getInstance().currentUser?.uid
                         if (userId != null) {
-                            navController.navigate(Routes.settingsRoute(userId)) {
+                            navController.navigate(Routes.accessibilitySettingsRoute(userId)) {
                                 launchSingleTop = true
                             }
                         }

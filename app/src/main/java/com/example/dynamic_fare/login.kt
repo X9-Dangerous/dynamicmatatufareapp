@@ -198,15 +198,20 @@ fun navigateByRole(navController: NavController, role: String?) {
     when (role) {
         "Matatu Operator" -> {
             val db = FirebaseDatabase.getInstance().reference.child("users").child(userId)
+            Log.d("LoginScreen", "Fetching user data for userId: $userId")
             
             db.get().addOnSuccessListener { snapshot ->
                 val operatorId = snapshot.child("operatorId").value as? String
+                Log.d("LoginScreen", "Raw operatorId from database: $operatorId")
+                
                 if (!operatorId.isNullOrEmpty()) {
                     Log.d("LoginScreen", "Successfully retrieved operatorId: $operatorId")
+                    Log.d("LoginScreen", "Navigating to operator home with operatorId: $operatorId")
                     navController.navigate(Routes.operatorHomeRoute(operatorId)) {
                         popUpTo(Routes.LoginScreenContent) { inclusive = true }
                     }
                 } else {
+                    Log.e("LoginScreen", "Operator ID is null or empty for userId: $userId")
                     Toast.makeText(navController.context, "Operator ID not found!", Toast.LENGTH_SHORT).show()
                 }
             }.addOnFailureListener { e ->

@@ -23,26 +23,26 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.dynamic_fare.ui.components.BottomNavigationBar
-
+import com.example.dynamic_fare.auth.UserRepository
+import com.example.dynamic_fare.auth.UserData
+import com.example.dynamic_fare.auth.OperatorData
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(navController: NavController, userId: String) {
     val auth = FirebaseAuth.getInstance()
     val currentUser = auth.currentUser
-    val firestore = FirebaseFirestore.getInstance()
-    var name by remember { mutableStateOf("Loading...") }
-    var email by remember { mutableStateOf("Loading...") }
-    var phoneNumber by remember { mutableStateOf("Loading...") }
-    var role by remember { mutableStateOf("Loading...") }
-    var businessName by remember { mutableStateOf("Loading...") }
-    var businessAddress by remember { mutableStateOf("Loading...") }
-    var licenseNumber by remember { mutableStateOf("Loading...") }
-    var profilePicUrl by remember { mutableStateOf<String?>(null) }
+    val userRepository = remember { UserRepository() }
+    val coroutineScope = rememberCoroutineScope()
+    
+    var userData by remember { mutableStateOf<UserData?>(null) }
+    var operatorData by remember { mutableStateOf<OperatorData?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var profilePicUrl by remember { mutableStateOf<String?>(null) }
 
     // Check if user is authenticated
     if (currentUser == null) {
@@ -56,48 +56,33 @@ fun ProfileScreen(navController: NavController, userId: String) {
 
     LaunchedEffect(userId) {
         if (userId.isNotEmpty()) {
-            // Use the currently authenticated user's ID
-            val targetUserId = if (currentUser.uid == userId) userId else currentUser.uid
-            
-            // First get user details
-            firestore.collection("users").document(targetUserId)
-                .get()
-                .addOnSuccessListener { userDoc ->
-                    if (userDoc.exists()) {
-                        name = userDoc.getString("name") ?: "Unknown"
-                        email = userDoc.getString("email") ?: "No email"
-                        phoneNumber = userDoc.getString("phoneNumber") ?: "No phone number"
-                        role = userDoc.getString("role") ?: "No role"
-                        profilePicUrl = userDoc.getString("profilePicUrl")
+            coroutineScope.launch {
+                // Use the currently authenticated user's ID
+                val targetUserId = if (currentUser.uid == userId) userId else currentUser.uid
+                
+                try {
+                    // Fetch user data
+                    userRepository.fetchUserData(targetUserId).onSuccess { user ->
+                        userData = user
+                        profilePicUrl = user.profilePicUrl
                         
                         // If user is an operator, fetch operator details
-                        if (role.equals("operator", ignoreCase = true)) {
-                            firestore.collection("operators").document(targetUserId)
-                                .get()
-                                .addOnSuccessListener { operatorDoc ->
-                                    if (operatorDoc.exists()) {
-                                        businessName = operatorDoc.getString("businessName") ?: "No business name"
-                                        businessAddress = operatorDoc.getString("businessAddress") ?: "No address"
-                                        licenseNumber = operatorDoc.getString("licenseNumber") ?: "No license"
-                                    }
-                                    isLoading = false
-                                }
-                                .addOnFailureListener { e ->
-                                    error = "Error loading operator details: ${e.message}"
-                                    isLoading = false
-                                }
-                        } else {
-                            isLoading = false
+                        if (user.role.equals("operator", ignoreCase = true)) {
+                            userRepository.fetchOperatorData(targetUserId).onSuccess { operator ->
+                                operatorData = operator
+                            }.onFailure { e ->
+                                error = "Failed to load operator data: ${e.message}"
+                            }
                         }
-                    } else {
-                        error = "User not found"
-                        isLoading = false
+                    }.onFailure { e ->
+                        error = "Failed to load user data: ${e.message}"
                     }
-                }
-                .addOnFailureListener { e ->
-                    error = "Error loading profile: ${e.message}"
+                } catch (e: Exception) {
+                    error = "Error: ${e.message}"
+                } finally {
                     isLoading = false
                 }
+            }
         }
     }
 
@@ -194,23 +179,27 @@ fun ProfileScreen(navController: NavController, userId: String) {
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Profile Information
-                    ProfileSection("Name", name)
-                    ProfileSection("Email", email)
-                    ProfileSection("Phone", phoneNumber)
-                    ProfileSection("Role", role)
-                    
-                    // Show operator-specific information if role is operator
-                    if (role.equals("operator", ignoreCase = true)) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Business Information",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        ProfileSection("Business Name", businessName)
-                        ProfileSection("Business Address", businessAddress)
-                        ProfileSection("License Number", licenseNumber)
+                    userData?.let { user ->
+                        ProfileSection("Name", user.name)
+                        ProfileSection("Email", user.email)
+                        ProfileSection("Phone", user.phoneNumber)
+                        ProfileSection("Role", user.role)
+                        
+                        // Show operator-specific information if role is operator
+                        if (user.role.equals("operator", ignoreCase = true)) {
+                            operatorData?.let { operator ->
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Business Information",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                ProfileSection("Business Name", operator.businessName)
+                                ProfileSection("Business Address", operator.businessAddress)
+                                ProfileSection("License Number", operator.licenseNumber)
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.weight(1f))

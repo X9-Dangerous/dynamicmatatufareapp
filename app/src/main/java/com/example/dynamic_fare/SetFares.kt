@@ -22,13 +22,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dynamic_fare.data.FareRepository
+import com.example.dynamic_fare.ui.screens.FareTabbedActivity
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.DatabaseReference
+import androidx.compose.material3.ButtonDefaults
+
 
 class SetFaresActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val matatuId = intent.getStringExtra("matatuId") ?: ""
+        Log.d("SetFaresActivity", "Received matatuId: $matatuId")
         setContent {
             SetFaresScreen(matatuId)
         }
@@ -37,6 +41,7 @@ class SetFaresActivity : ComponentActivity() {
 
 @Composable
 fun SetFaresScreen(matatuId: String) {
+    Log.d("SetFaresScreen", "Rendering with matatuId: $matatuId")
     val db = FirebaseDatabase.getInstance()
     val context = LocalContext.current
 
@@ -119,24 +124,42 @@ fun SetFaresScreen(matatuId: String) {
 
         Button(
             onClick = {
+                // Validation block
+                if (matatuId.isEmpty()) {
+                    message = "Error: Invalid Matatu ID"
+                    return@Button
+                }
+                Log.d("SetFaresScreen", "Saving fares for matatuId: $matatuId")
+                Log.d("SetFaresScreen", "Fare values: peak=$peakHours, nonPeak=$nonPeakHours, rainyPeak=$rainingPeakFare, rainyNonPeak=$rainingNonPeakFare, discount=$disabilityDiscount")
+                
                 FareRepository.saveFares(
-                    matatuId, peakHours, nonPeakHours,
-                    rainingPeakFare, rainingNonPeakFare, disabilityDiscount
+                    matatuId = matatuId,
+                    peak = peakHours,
+                    nonPeak = nonPeakHours,
+                    rainyPeak = rainingPeakFare,
+                    rainyNonPeak = rainingNonPeakFare,
+                    discount = disabilityDiscount
                 ) { resultMessage ->
                     message = resultMessage
 
                     if (resultMessage == "✅ Fares saved successfully!") {
                         Handler(Looper.getMainLooper()).post {
-                            val intent = Intent(context, FareDisplayActivity::class.java).apply {
+                            // Navigate back to DetailMatatu
+                            val intent = Intent(context, FareTabbedActivity::class.java).apply {
                                 putExtra("matatuId", matatuId)
+                                // Clear the back stack
+                                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
                             }
                             context.startActivity(intent)
+                            (context as? ComponentActivity)?.finish() // Close the current activity
                         }
                     }
                 }
             },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B51E0)),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF9B51E0)
+            )
         ) {
             Text("Save Fares")
         }
@@ -150,44 +173,10 @@ fun SetFaresScreen(matatuId: String) {
     }
 }
 
-fun saveFaresToFirebase(
-    db: FirebaseDatabase,
-    matatuId: String,
-    peak: String,
-    nonPeak: String,
-    rainyPeak: String,
-    rainyNonPeak: String,
-    discount: String,
-    onResult: (String) -> Unit
-) {
-    val fareData = mutableMapOf(
-        "peak_hours" to peak,
-        "non_peak_hours" to nonPeak,
-        "rainy_peak_hours" to rainyPeak,
-        "rainy_non_peak_hours" to rainyNonPeak
-    )
 
-    // Only add discount if it's not empty
-    if (discount.isNotEmpty()) {
-        fareData["disability_discount"] = discount
-    }
-
-    // Save to Firebase
-    val faresRef: DatabaseReference = db.reference.child("fares").child(matatuId)
-
-    faresRef.setValue(fareData)
-        .addOnSuccessListener {
-            Log.d("RealtimeDB", "Fares saved successfully")
-            onResult("Fares saved successfully!")
-        }
-        .addOnFailureListener { e ->
-            Log.e("RealtimeDB", "Error saving fares", e)
-            onResult("Error saving fares: ${e.message}")
-        }
-}
 
 @Preview(showBackground = true)
 @Composable
-fun SetFaresScreenPreview() {
-    SetFaresScreen(matatuId = "")
+private fun SetFaresScreenPreview() {
+    SetFaresScreen(matatuId = "preview_id")
 }

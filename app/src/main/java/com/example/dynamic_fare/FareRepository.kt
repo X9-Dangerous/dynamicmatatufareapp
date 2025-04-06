@@ -6,10 +6,21 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 
 object FareRepository {
+
     private val database: DatabaseReference = FirebaseDatabase.getInstance().reference.child("fares")
+    
+    init {
+        // Enable disk persistence for offline capabilities
+        try {
+            FirebaseDatabase.getInstance().setPersistenceEnabled(true)
+        } catch (e: Exception) {
+            Log.w("FareRepository", "Persistence already enabled")
+        }
+    }
 
     fun saveFares(
         matatuId: String,
@@ -20,27 +31,62 @@ object FareRepository {
         discount: String,
         onResult: (String) -> Unit
     ) {
-        val fareData = MatatuFares(
-            peakFare = peak.toDoubleOrNull() ?: 0.0,
-            nonPeakFare = nonPeak.toDoubleOrNull() ?: 0.0,
-            rainyPeakFare = rainyPeak.toDoubleOrNull() ?: 0.0,
-            rainyNonPeakFare = rainyNonPeak.toDoubleOrNull() ?: 0.0,
-            disabilityDiscount = discount.toDoubleOrNull() ?: 0.0
+        if (matatuId.isEmpty()) {
+            Log.e("FareRepository", "Invalid matatuId: empty string")
+            onResult("Error: Invalid Matatu ID")
+            return
+        }
+
+        // Validate fare values
+        val peakFare = peak.toDoubleOrNull()
+        val nonPeakFare = nonPeak.toDoubleOrNull()
+        val rainyPeakFare = rainyPeak.toDoubleOrNull()
+        val rainyNonPeakFare = rainyNonPeak.toDoubleOrNull()
+        val disabilityDiscount = discount.toDoubleOrNull()
+
+        if (peakFare == null || nonPeakFare == null || rainyPeakFare == null || rainyNonPeakFare == null) {
+            Log.e("FareRepository", "Invalid fare values")
+            onResult("Error: Please enter valid fare amounts")
+            return
+        }
+
+        // Create a map to match the database structure
+        val fareData = mapOf(
+            "matatuId" to matatuId,  // Add matatuId to the fare data
+            "peakFare" to peakFare,
+            "nonPeakFare" to nonPeakFare,
+            "rainyPeakFare" to rainyPeakFare,
+            "rainyNonPeakFare" to rainyNonPeakFare,
+            "disabilityDiscount" to (disabilityDiscount ?: 0.0),
+            "lastUpdated" to ServerValue.TIMESTAMP  // Add timestamp
         )
 
+        Log.d("FareRepository", "Saving fares for matatu: $matatuId with data: $fareData")
         database.child(matatuId).setValue(fareData)
             .addOnSuccessListener {
-                Log.d("FareRepository", "Fares saved successfully")
-                onResult(" Fares saved successfully!")
+                // Keep a reference in the matatus node as well
+                val matatuRef = FirebaseDatabase.getInstance().reference
+                    .child("matatus")
+                    .child(matatuId)
+                    .child("fareId")
+                matatuRef.setValue(matatuId)
+                    .addOnSuccessListener {
+                        Log.d("FareRepository", "Fares saved successfully for matatu: $matatuId")
+                        onResult("✅ Fares saved successfully!")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("FareRepository", "Error saving fares for matatu: $matatuId", e)
+                        onResult("Error saving fares: ${e.message}")
+                    }
             }
             .addOnFailureListener { e ->
-                Log.e("FareRepository", "Error saving fares", e)
+                Log.e("FareRepository", "Error saving fares for matatu: $matatuId", e)
                 onResult("Error saving fares: ${e.message}")
             }
     }
 
 
-    private val faresRef = FirebaseDatabase.getInstance().getReference("fares")
+    val faresRef = FirebaseDatabase.getInstance().getReference("fares")
 
     fun getFareDetails(matatuId: String, callback: (MatatuFares?) -> Unit) {
         faresRef.child(matatuId)

@@ -1,10 +1,14 @@
 package com.example.dynamic_fare
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dynamic_fare.data.FareRepository
 import com.example.dynamic_fare.models.MatatuFares // Import updated model
+import com.google.firebase.database.FirebaseDatabase
 
 class FareDisplayActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,12 +42,47 @@ fun FareDisplayScreen(matatuId: String) {
 
     // Fetch fare details when the screen is displayed
     LaunchedEffect(matatuId) {
-        FareRepository.getFareDetails(matatuId) { fetchedFares ->
+        if (matatuId.isEmpty()) {
+            errorMessage = "⚠️ Invalid Matatu ID"
+            isLoading = false
+            return@LaunchedEffect
+        }
+
+        Log.d("FareDisplayScreen", "Fetching fare details for matatuId: $matatuId")
+        val faresRef = FirebaseDatabase.getInstance().getReference("fares")
+        faresRef.child(matatuId).get().addOnSuccessListener { snapshot ->
+            val fetchedFares = if (snapshot.exists()) {
+                try {
+                    val peakFare = snapshot.child("peakFare").getValue(Double::class.java) ?: 0.0
+                    val nonPeakFare = snapshot.child("nonPeakFare").getValue(Double::class.java) ?: 0.0
+                    val rainyPeakFare = snapshot.child("rainyPeakFare").getValue(Double::class.java) ?: 0.0
+                    val rainyNonPeakFare = snapshot.child("rainyNonPeakFare").getValue(Double::class.java) ?: 0.0
+                    val disabilityDiscount = snapshot.child("disabilityDiscount").getValue(Double::class.java) ?: 0.0
+                    
+                    MatatuFares(
+                        peakFare = peakFare,
+                        nonPeakFare = nonPeakFare,
+                        rainyPeakFare = rainyPeakFare,
+                        rainyNonPeakFare = rainyNonPeakFare,
+                        disabilityDiscount = disabilityDiscount
+                    )
+                } catch (e: Exception) {
+                    Log.e("FareDisplayScreen", "Error parsing fare data", e)
+                    null
+                }
+            } else null
+
             if (fetchedFares != null) {
                 fareDetails = fetchedFares
+                Log.d("FareDisplayScreen", "Successfully loaded fare details: $fareDetails")
             } else {
                 errorMessage = "⚠️ Failed to load fare details. Please try again."
+                Log.e("FareDisplayScreen", "Failed to load fare details for matatuId: $matatuId")
             }
+            isLoading = false
+        }.addOnFailureListener { e ->
+            Log.e("FareDisplayScreen", "Error loading fare details", e)
+            errorMessage = "⚠️ Failed to load fare details. Please try again."
             isLoading = false
         }
     }

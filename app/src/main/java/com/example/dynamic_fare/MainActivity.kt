@@ -77,7 +77,11 @@ class MainActivity : ComponentActivity() {
                         OperatorHomeScreen(navController, operatorId = operatorId ?: "")
                     }
                     
-                    composable(Routes.HomeScreen) { 
+                    composable(
+                        route = Routes.HomeScreen,
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
                         MatatuEstimateScreen(navController)
                     }
 
