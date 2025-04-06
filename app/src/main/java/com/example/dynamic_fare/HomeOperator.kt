@@ -143,12 +143,21 @@ fun MatatuDetailItem(matatu: Matatu, navController: NavController, operatorId: S
             .padding(8.dp)
             .clickable {
                 try {
-                    // Use matatuId for navigation, fallback to registration number if needed
-                    val matatuId = matatu.matatuId ?: matatu.registrationNumber
-                    if (matatuId.isNotEmpty()) {
-                        navController.navigate(Routes.fareTabbedRoute(matatuId))
+                    // Use matatuId for navigation
+                    if (matatu.matatuId.isNotEmpty()) {
+                        Log.d("Navigation", "Navigating with matatuId: ${matatu.matatuId}")
+                        navController.navigate(Routes.fareTabbedRoute(matatu.matatuId))
                     } else {
-                        Log.e("Navigation", "Invalid matatuId")
+                        // If matatuId is empty, try to find it using registration number
+                        Log.d("Navigation", "Looking up matatuId for registration: ${matatu.registrationNumber}")
+                        MatatuRepository.getMatatuIdByRegistration(matatu.registrationNumber) { foundMatatuId ->
+                            if (foundMatatuId != null && foundMatatuId.isNotEmpty()) {
+                                Log.d("Navigation", "Found matatuId: $foundMatatuId")
+                                navController.navigate(Routes.fareTabbedRoute(foundMatatuId))
+                            } else {
+                                Log.e("Navigation", "Could not find matatuId for registration: ${matatu.registrationNumber}")
+                            }
+                        }
                     }
                 } catch (e: Exception) {
                     Log.e("Navigation", "Error navigating to detail: ${e.message}")
