@@ -43,6 +43,7 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.location.*
+import com.google.firebase.auth.FirebaseAuth
 import okhttp3.*
 import org.json.JSONObject
 import org.osmdroid.config.Configuration
@@ -112,11 +113,11 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
 
         // Set up direct line as fallback
         directLine = listOf(start, end)
-        
+
         // Note: We're not initializing routePoints here anymore
         // to ensure we don't override the API response points
         // with just start and end
-        
+
         // Log attempt to fetch route
         Log.d("ROUTE_FETCH_DETAIL", "Attempting to fetch route with ${start.latitude},${start.longitude} -> ${end.latitude},${end.longitude}")
 
@@ -143,12 +144,12 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                     isLoading = false
                     errorMessage = "Using direct route (API timeout)"
                     Toast.makeText(context, "Using direct line between points", Toast.LENGTH_SHORT).show()
-                    
+
                     // Set routePoints to directLine as fallback
                     routePoints = directLine ?: listOf(start, end)
-                    
+
                     // No need to force map redraw here, it will redraw on its own in the update function
-                    
+
                     Log.d("ROUTE_FALLBACK", "Using direct route as fallback due to API error")
                 }
             }
@@ -217,13 +218,13 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                                         // Fall back to direct line if not enough points
                                         routePoints = directLine ?: listOf(start, end)
                                     }
-                                    
+
                                     routeDistance = distanceInMeters / 1000 // Convert to kilometers
                                     routeDuration = durationInSeconds / 60 // Convert to minutes
                                     routeDirections = directions
                                     isLoading = false
                                     Log.d("ROUTE_INFO", "Distance: ${distanceInMeters/1000} km, Duration: ${durationInSeconds/60} min")
-                                    
+
                                     // Show a success toast
                                     Toast.makeText(context, "Route loaded successfully", Toast.LENGTH_SHORT).show()
                                 }
@@ -581,40 +582,40 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                     mapView?.let { mapViewInstance ->
                         val distance = routeDistance
                         val duration = routeDuration
-                        
+
                         if (startingLocation != null && destinationLocation != null && distance != null) {
                             try {
                                 // Create an overlay for the bottom left corner
                                 val infoOverlay = object : org.osmdroid.views.overlay.Overlay() {
                                     override fun draw(canvas: android.graphics.Canvas, mapView: MapView, shadow: Boolean) {
                                         if (shadow) return
-                                        
+
                                         try {
                                             // Create background paint
                                             val bgPaint = android.graphics.Paint().apply {
                                                 color = android.graphics.Color.argb(220, 25, 118, 210) // Semi-transparent blue
                                                 style = android.graphics.Paint.Style.FILL
                                             }
-                                            
+
                                             val borderPaint = android.graphics.Paint().apply {
                                                 color = android.graphics.Color.WHITE
                                                 style = android.graphics.Paint.Style.STROKE
                                                 strokeWidth = 2f
                                             }
-                                            
+
                                             val textPaint = android.graphics.Paint().apply {
                                                 color = android.graphics.Color.WHITE
                                                 style = android.graphics.Paint.Style.FILL
                                                 textSize = 24f
                                                 isFakeBoldText = true
                                             }
-                                            
+
                                             val smallTextPaint = android.graphics.Paint().apply {
                                                 color = android.graphics.Color.WHITE
                                                 style = android.graphics.Paint.Style.FILL
                                                 textSize = 20f
                                             }
-                                            
+
                                             // Create text with labels
                                             val distanceText = "Distance: ${DecimalFormat("#.#").format(distance)} km"
                                             val timeText = if (duration != null) {
@@ -622,24 +623,24 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                                             } else {
                                                 ""
                                             }
-                                            
+
                                             // Measure text
                                             val distanceBounds = android.graphics.Rect()
                                             textPaint.getTextBounds(distanceText, 0, distanceText.length, distanceBounds)
-                                            
+
                                             val timeBounds = android.graphics.Rect()
                                             if (timeText.isNotEmpty()) {
                                                 smallTextPaint.getTextBounds(timeText, 0, timeText.length, timeBounds)
                                             }
-                                            
+
                                             // Calculate size and position
                                             val padding = 16f
                                             val margin = 20f
                                             val spacing = 12f
-                                            
+
                                             val boxWidth = Math.max(distanceBounds.width(), timeBounds.width()) + (padding * 2)
                                             val boxHeight = distanceBounds.height() + (if (timeText.isNotEmpty()) timeBounds.height() + spacing else 0f) + (padding * 2)
-                                            
+
                                             // Position at bottom left with margin
                                             val rect = android.graphics.RectF(
                                                 margin,
@@ -647,11 +648,11 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                                                 margin + boxWidth,
                                                 mapView.height - margin
                                             )
-                                            
+
                                             // Draw rounded rectangle
                                             canvas.drawRoundRect(rect, 12f, 12f, bgPaint)
                                             canvas.drawRoundRect(rect, 12f, 12f, borderPaint)
-                                            
+
                                             // Draw distance text
                                             canvas.drawText(
                                                 distanceText,
@@ -659,7 +660,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                                                 rect.top + padding + distanceBounds.height(),
                                                 textPaint
                                             )
-                                            
+
                                             // Draw time text if available
                                             if (timeText.isNotEmpty()) {
                                                 canvas.drawText(
@@ -674,7 +675,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                                         }
                                     }
                                 }
-                                
+
                                 // Add overlay to map
                                 mapViewInstance.overlays.add(infoOverlay)
                                 Log.d("MAP_INFO", "Added distance/time overlay to bottom left")
@@ -691,7 +692,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                                 val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(routePoints)
                                 mapViewInstance.zoomToBoundingBox(boundingBox, true, 100)
                                 Log.d("MAP_ZOOM", "Zoomed to route points")
-                            } 
+                            }
                             // Case 2: We have direct line between points
                             else if (directLine != null && directLine!!.size >= 2) {
                                 val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(directLine!!)
@@ -732,7 +733,15 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
 
         // Pay Button
         Button(
-            onClick = { /* Handle Payment */ },
+            onClick = { 
+                val auth = FirebaseAuth.getInstance()
+                val userId = auth.currentUser?.uid
+                if (userId != null) {
+                    navController.navigate(Routes.qrScannerRoute(userId))
+                } else {
+                    Toast.makeText(context, "Please login first", Toast.LENGTH_SHORT).show()
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),

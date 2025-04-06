@@ -33,42 +33,70 @@ fun PaymentPage(
     var isLoading by remember { mutableStateOf(true) }
     var paymentStatus by remember { mutableStateOf("") }
 
-    // Fetch Matatu details based on QR code
+    // Fetch all required data in parallel
     LaunchedEffect(scannedQRCode) {
+        // Start weather fetch with timeout
+        var weatherFetched = false
+        var isRaining = false
+        val weatherTimeout = android.os.Handler(android.os.Looper.getMainLooper())
+        val weatherTimeoutRunnable = Runnable {
+            if (!weatherFetched) {
+                weatherFetched = true  // Force completion after timeout
+                android.util.Log.d("Payment", "Weather fetch timed out")
+            }
+        }
+        
+        weatherManager.fetchWeather("Nairobi") { raining ->
+            if (!weatherFetched) {  // Only update if we haven't timed out
+                isRaining = raining
+                weatherFetched = true
+                weatherTimeout.removeCallbacks(weatherTimeoutRunnable)
+            }
+        }
+        
+        // Set 2-second timeout for weather fetch
+        weatherTimeout.postDelayed(weatherTimeoutRunnable, 2000)
+
+        // Get matatu details
         val dbRef = FirebaseDatabase.getInstance().getReference("matatus").child(scannedQRCode)
         dbRef.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
-                registrationNumber = snapshot.child("registration").value?.toString()
+                registrationNumber = snapshot.child("registrationNumber").value?.toString()
+                
+                // Start fare fetch immediately after getting matatu details
+                fareManager.fetchFares(scannedQRCode) { fares ->
+                    if (fares != null) {
+                        // Check if weather is ready, if not wait briefly
+                        var attempts = 0
+                        val maxAttempts = 3  // Reduce max attempts
+                        val checkWeather = object : Runnable {
+                            override fun run() {
+                                if (weatherFetched || attempts >= maxAttempts) {
+                                    val isPeakHours = timeManager.isPeakHours()
+                                    val (finalFare, breakdown) = fareManager.getFare(fares, isPeakHours, isRaining, false, false)
+                                    fare = finalFare.toString()
+                                    paymentStatus = breakdown
+                                    isLoading = false
+                                } else {
+                                    attempts++
+                                    android.os.Handler(android.os.Looper.getMainLooper())
+                                        .postDelayed(this, 200) // Check every 200ms
+                                }
+                            }
+                        }
+                        checkWeather.run()
+                    } else {
+                        paymentStatus = "No fare data available."
+                        isLoading = false
+                    }
+                }
+            } else {
+                isLoading = false
+                paymentStatus = "Matatu not found."
             }
-            isLoading = false
         }.addOnFailureListener {
             isLoading = false
             paymentStatus = "Failed to fetch data from database."
-        }
-    }
-
-    // Fetch Fare details based on registration number
-    LaunchedEffect(registrationNumber) {
-        if (registrationNumber != null) {
-            val matatuRegNo = registrationNumber!!
-            getMatatuIdFromRegistration(matatuRegNo) { matatuId ->
-                if (matatuId != null) {
-                    fareManager.fetchFares(matatuId) { fares ->
-                        if (fares != null) {
-                            weatherManager.fetchWeather("Nairobi") { isRaining ->
-                                val isPeakHours = timeManager.isPeakHours()
-                                val (finalFare, breakdown) = fareManager.getFare(fares, isPeakHours, isRaining, false, false)
-                                fare = finalFare.toString()
-                                paymentStatus = breakdown
-                            }
-                        } else {
-                            paymentStatus = "No fare data available."
-                        }
-                    }
-                } else {
-                    paymentStatus = "Matatu not found with the given registration number."
-                }
-            }
         }
     }
 
@@ -105,7 +133,18 @@ fun PaymentPage(
         Spacer(modifier = Modifier.height(40.dp))
 
         if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Loading payment details...",
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+            }
         } else if (registrationNumber == null || fare == null) {
             Text(
                 text = "Matatu details not available",

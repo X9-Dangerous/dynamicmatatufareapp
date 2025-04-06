@@ -59,11 +59,18 @@ fun FareTabbedScreen(navController: NavController, matatuId: String) {
 @Composable
 fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
     var matatuDetails by remember { mutableStateOf<MatatuDetails?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(matatuId) {
         val database = FirebaseDatabase.getInstance().getReference("matatus")
         database.child(matatuId).get().addOnSuccessListener { snapshot ->
-            matatuDetails = snapshot.getValue(MatatuDetails::class.java)
+            if (snapshot.exists()) {
+                matatuDetails = snapshot.getValue(MatatuDetails::class.java)
+            } else {
+                error = "Matatu details not found"
+            }
+        }.addOnFailureListener { e ->
+            error = "Error loading matatu details: ${e.message}"
         }
     }
 
@@ -178,16 +185,24 @@ fun FareDetailsScreen(matatuId: String) {
 
     Column(modifier = Modifier.padding(16.dp)) {
         if (isLoading) {
-            Text("⏳ Loading fare details...", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
+            CircularProgressIndicator()
+            Text("Loading fare details...", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
         } else if (fareData == null) {
-            Text("No fare data found.", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
+            Text("No fare data found for this matatu.", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = {
-                val intent = Intent(context, SetFaresActivity::class.java)
-                intent.putExtra("matatuId", matatuId)
-                context.startActivity(intent)
-            }) {
-                Text("➕ Set Fares")
+            Button(
+                onClick = {
+                    val intent = Intent(context, SetFaresActivity::class.java).apply {
+                        putExtra("matatuId", matatuId)
+                    }
+                    context.startActivity(intent)
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Black,
+                    contentColor = Color.White
+                )
+            ) {
+                Text("Set Fares")
             }
         } else {
             // Ensure displayed values are not null
@@ -211,6 +226,7 @@ fun FareDetailsScreen(matatuId: String) {
 }
 
 data class MatatuDetails(
+    val matatuId: String = "",
     val registrationNumber: String = "",
     val routeStart: String = "",
     val routeEnd: String = "",
@@ -220,5 +236,6 @@ data class MatatuDetails(
     val sendMoneyPhone: String = "",
     val tillNumber: String = "",
     val paybillNumber: String = "",
-    val accountNumber: String = ""
+    val accountNumber: String = "",
+    val operatorId: String = ""
 )

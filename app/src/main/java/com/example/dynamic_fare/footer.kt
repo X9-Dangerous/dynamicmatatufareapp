@@ -20,6 +20,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.dynamic_fare.R
 import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun FooterWithIcons(navController: NavController) {
@@ -48,9 +49,19 @@ fun FooterWithIcons(navController: NavController) {
             )
             Icon(
                 painter = painterResource(id = R.drawable.ic_alerts),
-                contentDescription = "QR Code",
+                contentDescription = "Notifications",
                 tint = Color.Black,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier
+                    .size(32.dp)
+                    .clickable {
+                        // Get current user ID from Firebase Auth
+                        val userId = FirebaseAuth.getInstance().currentUser?.uid
+                        if (userId != null) {
+                            navController.navigate(Routes.notificationsRoute(userId)) {
+                                launchSingleTop = true
+                            }
+                        }
+                    }
             )
             Icon(
                 painter = painterResource(id = R.drawable.ic_acccount),
@@ -59,10 +70,27 @@ fun FooterWithIcons(navController: NavController) {
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
-                        // Navigate to ClientProfile
-                        navController.navigate("clientProfile") {
-                            // Prevent multiple copies of the destination on the back stack
-                            launchSingleTop = true
+                        val userId = FirebaseAuth.getInstance().currentUser?.uid
+                        if (userId != null) {
+                            navController.navigate(Routes.profileRoute(userId)) {
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+            )
+
+            Icon(
+                painter = painterResource(id = R.drawable.ic_settings),
+                contentDescription = "Settings",
+                tint = Color.Black,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clickable {
+                        val userId = FirebaseAuth.getInstance().currentUser?.uid
+                        if (userId != null) {
+                            navController.navigate(Routes.settingsRoute(userId)) {
+                                launchSingleTop = true
+                            }
                         }
                     }
             )

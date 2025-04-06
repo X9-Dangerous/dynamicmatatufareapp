@@ -42,6 +42,7 @@ import com.google.firebase.storage.FirebaseStorage
 import android.util.Log
 import android.widget.Toast
 
+
 class ProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,23 +71,23 @@ fun ClientProfileScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isUploadingImage by remember { mutableStateOf(false) }
-    
+
     // Get current user ID from Firebase Auth
     val auth = FirebaseAuth.getInstance()
     val currentUser = auth.currentUser
     val userId = currentUser?.uid
-    
+
     val context = LocalContext.current
-    
+
     // Function to handle image upload to Firebase Storage
     val handleImageUpload = { imageUri: Uri? ->
         if (imageUri != null && userId != null) {
             isUploadingImage = true
-            
+
             // Reference to Firebase Storage
             val storageRef = FirebaseStorage.getInstance().reference
             val profileImageRef = storageRef.child("profile_images/$userId.jpg")
-            
+
             // Upload the image
             val uploadTask = profileImageRef.putFile(imageUri)
             uploadTask.continueWithTask { task ->
@@ -98,7 +99,7 @@ fun ClientProfileScreen(navController: NavController) {
                 if (task.isSuccessful) {
                     // Get the download URL
                     val downloadUrl = task.result.toString()
-                    
+
                     // Update the profile URL in the database
                     val database = FirebaseDatabase.getInstance().reference
                     val userRef = database.child("users").child(userId)
@@ -122,31 +123,31 @@ fun ClientProfileScreen(navController: NavController) {
             }
         }
     }
-    
+
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         handleImageUpload(uri)
     }
-    
+
     // Function to handle logout
     val onLogout = {
         // Sign out from Firebase Auth
         auth.signOut()
-        
+
         // Navigate back to login
         navController.navigate(Routes.LoginScreenContent) {
             popUpTo(0) { inclusive = true }
         }
     }
-    
+
     // Effect to fetch user data when component is first loaded
     LaunchedEffect(userId) {
         if (userId != null) {
             val database = FirebaseDatabase.getInstance().reference
             val userRef = database.child("users").child(userId)
-            
+
             userRef.addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     if (snapshot.exists()) {
@@ -162,7 +163,7 @@ fun ClientProfileScreen(navController: NavController) {
                     }
                     isLoading = false
                 }
-                
+
                 override fun onCancelled(error: DatabaseError) {
                     Log.e("ClientProfile", "Error fetching user data: ${error.message}")
                     errorMessage = "Could not load profile: ${error.message}"
@@ -175,7 +176,7 @@ fun ClientProfileScreen(navController: NavController) {
             isLoading = false
         }
     }
-    
+
     ProfileScreen(
         username = username,
         email = email,
@@ -234,7 +235,7 @@ fun ProfileScreen(
                         .background(Color.Gray, shape = CircleShape)
                         .border(2.dp, Color.LightGray, CircleShape)
                 )
-                
+
                 // Edit overlay
                 Box(
                     modifier = Modifier
@@ -281,7 +282,7 @@ fun ProfileScreen(
                     color = Color.DarkGray,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
-                
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_alerts), // Replace with email icon
@@ -296,9 +297,9 @@ fun ProfileScreen(
                         color = Color.Black
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_phone), // Replace with phone icon
@@ -326,7 +327,7 @@ fun ProfileScreen(
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
-        
+
         // Show loading indicator if needed
         if (isLoading) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -336,7 +337,7 @@ fun ProfileScreen(
                 Text("Loading...", color = Color.Gray)
             }
         }
-        
+
         Spacer(modifier = Modifier.height(100.dp))
 
         // Logout Button
@@ -346,15 +347,14 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 24.dp)
-                // Add padding for system bars
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             Text(text = "Logout", color = Color.White)
         }
 
-        Spacer(modifier = Modifier.weight(1f)) // Push footer to bottom
+        Spacer(modifier = Modifier.weight(1f))
 
-        // Using the shared footer from footer.kt
+        // Footer
         FooterWithIcons(navController)
     }
 }

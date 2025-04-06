@@ -3,9 +3,16 @@ package com.example.dynamic_fare
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.compose.rememberNavController
 import com.example.dynamic_fare.ui.screens.RegistrationScreen
 import com.example.dynamic_fare.utils.FirebaseHelper
+import com.google.firebase.database.FirebaseDatabase
+import java.util.UUID
 
 class RegistrationActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -18,11 +25,23 @@ class RegistrationActivity : ComponentActivity() {
     }
 
     private fun launchRegistrationScreen(operatorId: String) {
-        val sampleRoutes = listOf("Route 1", "Route 2", "Route 3") // Example routes
-
         setContent {
             val navController = rememberNavController()
-            RegistrationScreen(navController = navController, operatorId = operatorId)
+            MaterialTheme(
+                colorScheme = MaterialTheme.colorScheme.copy(
+                    surface = Color.White,
+                    onSurface = Color.Black,
+                    primary = Color.Black,
+                    onPrimary = Color.White
+                )
+            ) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    RegistrationScreen(
+                        navController = navController,
+                        operatorId = operatorId
+                    )
+                }
+            }
         }
     }
 }

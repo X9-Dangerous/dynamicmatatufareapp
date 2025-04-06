@@ -190,30 +190,40 @@ fun navigateByRole(navController: NavController, role: String?) {
     val auth = FirebaseAuth.getInstance()
     val userId = auth.currentUser?.uid
 
-    if (role == "Matatu Operator" && userId != null) {
-        val db = FirebaseDatabase.getInstance().reference.child("users").child(userId).child("operatorId")
+    if (userId == null) {
+        Toast.makeText(navController.context, "Authentication error", Toast.LENGTH_SHORT).show()
+        return
+    }
 
-        db.get().addOnSuccessListener { snapshot ->
-            val operatorId = snapshot.value as? String
-            if (!operatorId.isNullOrEmpty()) {
-                Log.d("LoginScreen", "Successfully retrieved operatorId: $operatorId")
-                navController.navigate("${Routes.OperatorHome}?operatorId=$operatorId")
-                {
-                    popUpTo(Routes.LoginScreenContent) { inclusive = true }
+    when (role) {
+        "Matatu Operator" -> {
+            val db = FirebaseDatabase.getInstance().reference.child("users").child(userId)
+            
+            db.get().addOnSuccessListener { snapshot ->
+                val operatorId = snapshot.child("operatorId").value as? String
+                if (!operatorId.isNullOrEmpty()) {
+                    Log.d("LoginScreen", "Successfully retrieved operatorId: $operatorId")
+                    navController.navigate(Routes.operatorHomeRoute(operatorId)) {
+                        popUpTo(Routes.LoginScreenContent) { inclusive = true }
+                    }
+                } else {
+                    Toast.makeText(navController.context, "Operator ID not found!", Toast.LENGTH_SHORT).show()
                 }
-                Log.d("LoginScreen", "Navigating to OperatorHome with operatorId: $operatorId")
-            } else {
-                Toast.makeText(navController.context, "Operator ID not found!", Toast.LENGTH_SHORT).show()
+            }.addOnFailureListener { e ->
+                Log.e("LoginScreen", "Error retrieving operatorId", e)
+                Toast.makeText(navController.context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
-    } else if (role == "Matatu Client") {
-        navController.navigate(Routes.MatatuEstimateScreen) {
-            popUpTo(Routes.LoginScreenContent) { inclusive = true }
+        "Matatu Client" -> {
+            navController.navigate(Routes.matatuEstimateRoute()) {
+                popUpTo(Routes.LoginScreenContent) { inclusive = true }
+            }
         }
-    } else {
-        Toast.makeText(navController.context, "Redirecting to homepage", Toast.LENGTH_SHORT).show()
-        navController.navigate(Routes.LoginScreenContent) {
-            popUpTo(Routes.LoginScreenContent) { inclusive = true }
+        else -> {
+            Toast.makeText(navController.context, "Invalid role", Toast.LENGTH_SHORT).show()
+            navController.navigate(Routes.LoginScreenContent) {
+                popUpTo(Routes.LoginScreenContent) { inclusive = true }
+            }
         }
     }
 }

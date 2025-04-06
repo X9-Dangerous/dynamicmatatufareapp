@@ -67,7 +67,7 @@ fun getGtfsStopSuggestions(input: String, context: Context): List<GtfsStopSugges
     try {
         // Get all GTFS stops from the stops.txt file
         val gtfsStops = getGtfsStopsFromFile(context)
-        
+
         Log.d("GTFS", "Found ${gtfsStops.size} stops for filtering with input: $input")
 
         // Filter the stops based on user input
@@ -94,9 +94,9 @@ private fun getGtfsStopsFromFile(context: Context): List<GtfsStopSuggestion> {
         context.assets.open("stops.txt").bufferedReader().use { reader ->
             // Read all lines
             val lines = reader.readLines()
-            
+
             Log.d("GTFS", "Found ${lines.size} lines in stops.txt")
-            
+
             // Skip header and process all data lines
             if (lines.isNotEmpty()) {
                 lines.drop(1).forEach { line ->
@@ -260,10 +260,6 @@ fun saveQRCodeToStorage(context: Context, bitmap: Bitmap) {
 
 @Composable
 fun RegistrationScreen(navController: NavController, operatorId: String) {
-    val context = LocalContext.current
-    val intent = (context as? android.app.Activity)?.intent
-    Log.d("RegistrationScreen", "operatorId received: $operatorId")
-    val operatorId = intent?.getStringExtra("operatorId") ?: operatorId
     var regNumber by remember { mutableStateOf("") }
     var routeStart by remember { mutableStateOf("") }
     var routeEnd by remember { mutableStateOf("") }
@@ -277,21 +273,21 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
     var sendMoneyPhone by remember { mutableStateOf("") }
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var errorMessage by remember { mutableStateOf("") }
-    
+
     // GTFS suggestion states
     var startingSuggestions by remember { mutableStateOf<List<GtfsStopSuggestion>>(emptyList()) }
     var destinationSuggestions by remember { mutableStateOf<List<GtfsStopSuggestion>>(emptyList()) }
     var showStartingSuggestions by remember { mutableStateOf(false) }
     var showDestinationSuggestions by remember { mutableStateOf(false) }
-    
+
     // Coordinates for start and end points from GTFS data
     var startLocationCoordinates by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var endLocationCoordinates by remember { mutableStateOf<Pair<Double, Double>?>(null) }
 
-
+    val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val coroutineScope = rememberCoroutineScope()
-    
+
     // Load initial GTFS data when the screen is first shown
     LaunchedEffect(Unit) {
         try {
@@ -303,7 +299,7 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
             Log.e("GTFS", "Error preloading GTFS data: ${e.message}", e)
         }
     }
-    
+
     // Effect to update suggestions when input changes
     LaunchedEffect(routeStart) {
         if (routeStart.length >= 2) {
@@ -314,7 +310,7 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
             showStartingSuggestions = false
         }
     }
-    
+
     LaunchedEffect(routeEnd) {
         if (routeEnd.length >= 2) {
             destinationSuggestions = getGtfsStopSuggestions(routeEnd, context)
@@ -353,7 +349,7 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
             // Route Start with GTFS autosuggestions
             GtfsInputField(
                 value = routeStart,
-                onValueChange = { 
+                onValueChange = {
                     routeStart = it
                     startLocationCoordinates = null // Reset coordinates when manually typing
                 },
@@ -374,7 +370,7 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
             // Route End with GTFS autosuggestions
             GtfsInputField(
                 value = routeEnd,
-                onValueChange = { 
+                onValueChange = {
                     routeEnd = it
                     endLocationCoordinates = null // Reset coordinates when manually typing
                 },
@@ -467,12 +463,12 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
                 coroutineScope.launch {
                     try {
                         // Add coordinates to QR data if available
-                        val startCoords = if (startLocationCoordinates != null) 
-                                          "${startLocationCoordinates?.first},${startLocationCoordinates?.second}" 
-                                          else ""
-                        val endCoords = if (endLocationCoordinates != null) 
-                                        "${endLocationCoordinates?.first},${endLocationCoordinates?.second}" 
-                                        else ""
+                        val startCoords = if (startLocationCoordinates != null)
+                            "${startLocationCoordinates?.first},${startLocationCoordinates?.second}"
+                        else ""
+                        val endCoords = if (endLocationCoordinates != null)
+                            "${endLocationCoordinates?.first},${endLocationCoordinates?.second}"
+                        else ""
                         val qrData = "$regNumber|$routeStart|$routeEnd|$startCoords|$endCoords|$mpesaType|$pochiNumber|$paybillNumber|$accountNumber|$tillNumber|$sendMoneyPhone"
                         val bitMatrix: BitMatrix = MultiFormatWriter().encode(qrData, BarcodeFormat.QR_CODE, 500, 500)
                         val barcodeEncoder = BarcodeEncoder()
