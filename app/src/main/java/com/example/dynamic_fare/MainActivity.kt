@@ -74,7 +74,6 @@ class MainActivity : ComponentActivity() {
                         val operatorId = backStackEntry.arguments?.getString("operatorId")
                         OperatorHomeScreen(navController, operatorId = operatorId ?: "")
                     }
-
                     composable(Routes.MatatuDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) {
                             backStackEntry -> MatatuDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
                     }
@@ -152,5 +151,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+                    composable(Routes.ClientProfile) {
+                        ClientProfileScreen(navController)
+                    }
+
+
+                }
+            }
+        }
+    }
+
+    private fun getMatatuIdFromRegistration(registration: String) {
+
     }
 }

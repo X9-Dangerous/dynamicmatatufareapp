@@ -59,7 +59,11 @@ fun FooterWithIcons(navController: NavController) {
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
-                        navController.navigate(Routes.ProfileScreen)
+                        // Navigate to ClientProfile
+                        navController.navigate("clientProfile") {
+                            // Prevent multiple copies of the destination on the back stack
+                            launchSingleTop = true
+                        }
                     }
             )
         }

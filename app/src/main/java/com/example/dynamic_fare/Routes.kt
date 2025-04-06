@@ -5,6 +5,7 @@ import androidx.navigation.*
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.dynamic_fare.Routes.PaymentScreen
 import com.example.dynamic_fare.ui.*
 import com.example.dynamic_fare.ui.screens.*
 import com.example.dynamic_fare.ui.screens.RegistrationScreen
@@ -85,7 +86,6 @@ fun AppNavigation(
             OperatorHomeScreen(navController, operatorId = operatorId ?: "")
         }
 
-
         composable(Routes.FleetRegistrationScreen, arguments = listOf(navArgument("operatorId") { type = NavType.StringType })) {
                 backStackEntry -> FleetRegistrationScreen(navController, backStackEntry.arguments?.getString("operatorId") ?: "")
         }
@@ -142,6 +142,5 @@ fun AppNavigation(
         composable(Routes.FareDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) {
                 backStackEntry -> FareDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
         }
-
     }
 }
