@@ -32,6 +32,8 @@ fun PaymentPage(
     var fare by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var paymentStatus by remember { mutableStateOf("") }
+    var mpesaOption by remember { mutableStateOf<String?>(null) }
+    var mpesaDetails by remember { mutableStateOf<Map<String, String>>(mapOf()) }
 
     // Fetch all required data in parallel
     LaunchedEffect(scannedQRCode) {
@@ -46,14 +48,6 @@ fun PaymentPage(
             }
         }
         
-        weatherManager.fetchWeather("Nairobi") { raining ->
-            if (!weatherFetched) {  // Only update if we haven't timed out
-                isRaining = raining
-                weatherFetched = true
-                weatherTimeout.removeCallbacks(weatherTimeoutRunnable)
-            }
-        }
-        
         // Set 2-second timeout for weather fetch
         weatherTimeout.postDelayed(weatherTimeoutRunnable, 2000)
 
@@ -62,6 +56,48 @@ fun PaymentPage(
         dbRef.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
                 registrationNumber = snapshot.child("registrationNumber").value?.toString()
+                mpesaOption = snapshot.child("mpesaOption").value?.toString()
+                
+                // Get M-Pesa details based on the option
+                android.util.Log.d("Payment", "Raw mpesaOption: $mpesaOption")
+                when (mpesaOption?.lowercase()) {
+                    "pochi la biashara" -> {
+                        mpesaDetails = mapOf(
+                            "pochiNumber" to (snapshot.child("pochiNumber").value?.toString() ?: "")
+                        )
+                    }
+                    "paybill" -> {
+                        mpesaDetails = mapOf(
+                            "paybillNumber" to (snapshot.child("paybillNumber").value?.toString() ?: ""),
+                            "accountNumber" to (snapshot.child("accountNumber").value?.toString() ?: "")
+                        )
+                    }
+                    "till" -> {
+                        mpesaDetails = mapOf(
+                            "tillNumber" to (snapshot.child("tillNumber").value?.toString() ?: "")
+                        )
+                    }
+                    "send money" -> {
+                        mpesaDetails = mapOf(
+                            "phoneNumber" to (snapshot.child("sendMoneyPhone").value?.toString() ?: "")
+                        )
+                    }
+                }
+                
+                android.util.Log.d("Payment", "M-Pesa Option: $mpesaOption, Details: $mpesaDetails")
+                
+                // Get city and fetch weather
+                val city = snapshot.child("routeStart").value?.toString()?.split(",")?.lastOrNull()?.trim() ?: "Nairobi"
+                android.util.Log.d("Payment", "Fetching weather for city: $city")
+                
+                weatherManager.fetchWeather(city) { raining ->
+                    if (!weatherFetched) {  // Only update if we haven't timed out
+                        isRaining = raining
+                        weatherFetched = true
+                        weatherTimeout.removeCallbacks(weatherTimeoutRunnable)
+                        android.util.Log.d("Payment", "Weather status for $city - isRaining: $raining")
+                    }
+                }
                 
                 // Start fare fetch immediately after getting matatu details
                 fareManager.fetchFares(scannedQRCode) { fares ->
@@ -74,9 +110,11 @@ fun PaymentPage(
                                 if (weatherFetched || attempts >= maxAttempts) {
                                     val isPeakHours = timeManager.isPeakHours()
                                     val (finalFare, breakdown) = fareManager.getFare(fares, isPeakHours, isRaining, false, false)
-                                    fare = finalFare.toString()
+                                    // Round to nearest whole number to avoid decimal issues
+                                    fare = finalFare.toInt().toString()
                                     paymentStatus = breakdown
                                     isLoading = false
+                                    android.util.Log.d("Payment", "Final fare amount: $fare")
                                 } else {
                                     attempts++
                                     android.os.Handler(android.os.Looper.getMainLooper())
@@ -158,7 +196,13 @@ fun PaymentPage(
             Spacer(modifier = Modifier.height(20.dp))
             PaymentDetailRow("Fare", "KES $fare")
             Spacer(modifier = Modifier.height(20.dp))
-            PaymentDetailRow("Payment method", "M-Pesa")
+            PaymentDetailRow("Payment method", when(mpesaOption?.lowercase()) {
+                "pochi la biashara" -> "M-Pesa Pochi la Biashara"
+                "paybill" -> "M-Pesa Paybill"
+                "till" -> "M-Pesa Till"
+                "send money" -> "M-Pesa Send Money"
+                else -> "M-Pesa"
+            })
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -178,9 +222,30 @@ fun PaymentPage(
                     isLoading = true
                     paymentStatus = "Processing payment..."
 
-                    val validFare = fare?.toIntOrNull() ?: 0
+                    // Convert fare string to integer, removing any non-numeric characters
+                    val fareString = fare?.replace(Regex("[^0-9]"), "") ?: "0"
+                    val validFare = fareString.toIntOrNull() ?: 0
+                    
+                    android.util.Log.d("Payment", "Initiating payment with amount: $validFare")
+                    if (validFare <= 0) {
+                        isLoading = false
+                        paymentStatus = "Invalid fare amount"
+                        return@Button
+                    }
 
-                    MpesaPaymentHandler.initiatePayment(context, registrationNumber!!, validFare) { success, message ->
+                    if (mpesaOption == null) {
+                        isLoading = false
+                        paymentStatus = "M-Pesa payment option not configured"
+                        return@Button
+                    }
+
+                    MpesaPaymentHandler.initiatePayment(
+                        context = context,
+                        registrationNumber = registrationNumber!!,
+                        amount = validFare,
+                        mpesaOption = mpesaOption!!,
+                        mpesaDetails = mpesaDetails
+                    ) { success, message ->
                         isLoading = false
                         paymentStatus = message
 

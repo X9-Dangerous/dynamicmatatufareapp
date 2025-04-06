@@ -5,20 +5,28 @@ const admin = require("firebase-admin");
 require("dotenv").config();
 
 // Initialize Firebase Admin SDK
-const serviceAccount = require("./serviceAccountKey.json");
+const serviceAccount = require("./firebaseServiceAccountKey.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://fair-5268e-default-rtdb.asia-southeast1.firebasedatabase.app/"
 });
 
+// Create the Express app
 const app = express();
+
+// Middleware
 app.use(bodyParser.json());
 app.use(cors());
 
+// Root route
+app.get("/", (req, res) => {
+  res.send("Server is working!");
+});
+
 const db = admin.database();
 
-//M-Pesa STK Push Endpoint**
+// M-Pesa STK Push Endpoint
 app.post("/stkpush", async (req, res) => {
   try {
     const { matatu_id, user_id, amount, phone_number, mpesa_receipt } = req.body;

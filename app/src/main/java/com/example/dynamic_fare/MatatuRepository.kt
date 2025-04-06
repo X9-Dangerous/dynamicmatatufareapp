@@ -112,4 +112,27 @@ object MatatuRepository {
                 onComplete(false)
             }
     }
+
+    // ✅ Get matatuId by registration number
+    fun getMatatuIdByRegistration(registrationNumber: String, onResult: (String?) -> Unit) {
+        database.orderByChild("registrationNumber").equalTo(registrationNumber)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (snapshot.exists()) {
+                        // Get the first matching matatu's ID
+                        val matatuId = snapshot.children.first().key
+                        Log.d("MatatuRepository", "Found matatuId: $matatuId for registration: $registrationNumber")
+                        onResult(matatuId)
+                    } else {
+                        Log.e("MatatuRepository", "No matatu found for registration: $registrationNumber")
+                        onResult(null)
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("MatatuRepository", "Error finding matatu by registration: ${error.message}")
+                    onResult(null)
+                }
+            })
+    }
 }
