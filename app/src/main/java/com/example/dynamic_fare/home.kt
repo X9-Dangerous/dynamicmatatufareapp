@@ -816,21 +816,6 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Price Estimate Section
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .background(Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(text = "Price", fontSize = 18.sp, color = Color.Black)
-            Text(text = "Ksh", fontSize = 18.sp, color = Color.Black)
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Pay Button
         Button(
             onClick = {
