@@ -44,9 +44,11 @@ object MpesaPaymentHandler {
                 }
             }
             "till number" -> {
+                android.util.Log.d("MpesaPayment", "Processing Till Number payment with details: $mpesaDetails")
                 val tillNumber = mpesaDetails["tillNumber"]
                 if (tillNumber.isNullOrEmpty()) {
-                    callback(false, "Till number not found")
+                    android.util.Log.e("MpesaPayment", "Till number is null or empty in details: $mpesaDetails")
+                    callback(false, "Till number not found in payment details")
                     return
                 }
                 android.util.Log.d("MpesaPayment", "Initiating Till payment to: $tillNumber")

@@ -72,7 +72,7 @@ fun PaymentPage(
                             "accountNumber" to (snapshot.child("accountNumber").value?.toString() ?: "")
                         )
                     }
-                    "till" -> {
+                    "till number" -> {
                         mpesaDetails = mapOf(
                             "tillNumber" to (snapshot.child("tillNumber").value?.toString() ?: "")
                         )
