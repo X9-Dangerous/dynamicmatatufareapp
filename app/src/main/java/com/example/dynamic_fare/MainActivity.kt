@@ -216,7 +216,7 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("userId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val userId = backStackEntry.arguments?.getString("userId") ?: ""
-                        NotificationsScreen(navController = navController, userId = userId)
+                        PaymentHistoryScreen(navController = navController, userId = userId)
                     }
 
                 }

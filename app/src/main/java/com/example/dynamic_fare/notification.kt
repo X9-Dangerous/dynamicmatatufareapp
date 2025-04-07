@@ -19,39 +19,43 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.database.FirebaseDatabase
 
-data class NotificationItem(
+data class PaymentHistoryItem(
     val id: String = "",
     val userId: String = "",
-    val title: String = "",
-    val message: String = "",
+    val amount: Double = 0.0,
+    val route: String = "",
     val timestamp: Long = 0,
-    val isRead: Boolean = false
+    val status: String = "",
+    val startLocation: String = "",
+    val endLocation: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationsScreen(navController: NavController, userId: String) {
-    var notifications by remember { mutableStateOf<List<NotificationItem>>(emptyList()) }
+fun PaymentHistoryScreen(navController: NavController, userId: String) {
+    var payments by remember { mutableStateOf<List<PaymentHistoryItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(userId) {
-        val database = FirebaseDatabase.getInstance().getReference("notifications")
+        val database = FirebaseDatabase.getInstance().getReference("payments")
         database.orderByChild("userId").equalTo(userId).get()
             .addOnSuccessListener { snapshot ->
-                val notificationsList = mutableListOf<NotificationItem>()
+                val paymentsList = mutableListOf<PaymentHistoryItem>()
                 snapshot.children.forEach { child ->
-                    val notification = NotificationItem(
+                    val payment = PaymentHistoryItem(
                         id = child.key ?: "",
                         userId = child.child("userId").getValue(String::class.java) ?: "",
-                        title = child.child("title").getValue(String::class.java) ?: "",
-                        message = child.child("message").getValue(String::class.java) ?: "",
+                        amount = child.child("amount").getValue(Double::class.java) ?: 0.0,
+                        route = child.child("route").getValue(String::class.java) ?: "",
                         timestamp = child.child("timestamp").getValue(Long::class.java) ?: 0L,
-                        isRead = child.child("isRead").getValue(Boolean::class.java) ?: false
+                        status = child.child("status").getValue(String::class.java) ?: "completed",
+                        startLocation = child.child("startLocation").getValue(String::class.java) ?: "",
+                        endLocation = child.child("endLocation").getValue(String::class.java) ?: ""
                     )
-                    notificationsList.add(notification)
+                    paymentsList.add(payment)
                 }
-                notifications = notificationsList.sortedByDescending { it.timestamp }
+                payments = paymentsList.sortedByDescending { it.timestamp }
                 isLoading = false
             }
             .addOnFailureListener { e ->
@@ -63,7 +67,7 @@ fun NotificationsScreen(navController: NavController, userId: String) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Notifications") },
+                title = { Text("Payment History") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -92,58 +96,68 @@ fun NotificationsScreen(navController: NavController, userId: String) {
                         modifier = Modifier.padding(16.dp)
                     )
                 }
-                notifications.isEmpty() -> {
+                payments.isEmpty() -> {
                     Text(
-                        text = "No notifications",
+                        text = "No payment history",
                         modifier = Modifier.padding(16.dp)
                     )
                 }
                 else -> {
                     LazyColumn {
-                        items(notifications) { notification ->
-                            NotificationCard(notification) {
-                                // Mark as read
-                                if (!notification.isRead) {
-                                    FirebaseDatabase.getInstance()
-                                        .getReference("notifications")
-                                        .child(notification.id)
-                                        .child("isRead")
-                                        .setValue(true)
-                                }
-                            }
+                        items(payments) { payment ->
+                            PaymentHistoryCard(payment)
                         }
                     }
                 }
             }
         }
     }
-}
+                }
+
 
 @Composable
-fun NotificationCard(notification: NotificationItem, onClick: () -> Unit) {
+fun PaymentHistoryCard(payment: PaymentHistoryItem) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (!notification.isRead) Color(0xFFE3F2FD) else MaterialTheme.colorScheme.surface
-        )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "KES ${String.format("%.2f", payment.amount)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                Text(
+                    text = payment.status,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when(payment.status) {
+                        "completed" -> Color.Green
+                        "failed" -> Color.Red
+                        else -> Color.Gray
+                    }
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = notification.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                text = "${payment.startLocation} → ${payment.endLocation}",
+                style = MaterialTheme.typography.bodyMedium
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = notification.message,
-                style = MaterialTheme.typography.bodyMedium
+                text = "Route: ${payment.route}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault())
+                    .format(java.util.Date(payment.timestamp)),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
             )
         }
     }
@@ -151,6 +165,9 @@ fun NotificationCard(notification: NotificationItem, onClick: () -> Unit) {
 
 @Preview(showBackground = true)
 @Composable
-fun NotificationsScreenPreview(){
-    NotificationsScreen(navController = rememberNavController(), userId = "") 
+fun PaymentHistoryScreenPreview() {
+    PaymentHistoryScreen(
+        navController = rememberNavController(),
+        userId = "preview_user_id"
+    )
 }

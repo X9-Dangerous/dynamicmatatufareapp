@@ -14,7 +14,8 @@ import com.google.firebase.database.FirebaseDatabase
 data class UserAccessibilitySettings(
     val userId: String = "",
     val isDisabled: Boolean = false,
-    val notificationsEnabled: Boolean = true
+    val notificationsEnabled: Boolean = true,
+    val lastUpdated: Long = System.currentTimeMillis()
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -22,6 +23,7 @@ data class UserAccessibilitySettings(
 fun AccessibilitySettingsScreen(navController: NavController, userId: String) {
     var userSettings by remember { mutableStateOf(UserAccessibilitySettings(userId = userId)) }
     var isLoading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
 
     // Load user settings
     LaunchedEffect(userId) {
@@ -31,12 +33,24 @@ fun AccessibilitySettingsScreen(navController: NavController, userId: String) {
                 userSettings = UserAccessibilitySettings(
                     userId = userId,
                     isDisabled = snapshot.child("isDisabled").getValue(Boolean::class.java) ?: false,
-                    notificationsEnabled = snapshot.child("notificationsEnabled").getValue(Boolean::class.java) ?: true
+                    notificationsEnabled = snapshot.child("notificationsEnabled").getValue(Boolean::class.java) ?: true,
+                    lastUpdated = snapshot.child("lastUpdated").getValue(Long::class.java) ?: System.currentTimeMillis()
                 )
+            } else {
+                // Initialize settings if they don't exist
+                val initialSettings = UserAccessibilitySettings(userId = userId)
+                database.child(userId).setValue(initialSettings)
+                    .addOnSuccessListener {
+                        userSettings = initialSettings
+                    }
+                    .addOnFailureListener { e ->
+                        error = "Failed to initialize settings: ${e.message}"
+                    }
             }
             isLoading = false
         }
-        .addOnFailureListener {
+        .addOnFailureListener { e ->
+            error = "Error loading settings: ${e.message}"
             isLoading = false
         }
     }

@@ -4,22 +4,26 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Color as AndroidColor
 import android.location.Location
-import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.text.font.FontWeight as ComposeTextFontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.LocationOn
@@ -30,9 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight as ComposeTextFontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -41,9 +43,7 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.location.*
-import com.google.android.gms.location.LocationServices
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.*
 import okhttp3.*
 import org.json.JSONObject
 import org.osmdroid.config.Configuration
@@ -52,77 +52,23 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import java.io.IOException
-import java.text.DecimalFormat
-import java.util.Calendar
-
-// Sealed class for fare estimate state
-sealed class FareEstimateState {
-    object Initial : FareEstimateState()
-    object Loading : FareEstimateState()
-    data class Success(
-        val baseFare: Double,
-        val peakHourFare: Double,
-        val rainyDayFare: Double,
-        val discountedFare: Double
-    ) : FareEstimateState()
-    data class Error(val message: String) : FareEstimateState()
-}
-
-// Repository for handling fare estimates
-class FareEstimateRepository {
-    private val firebaseRepo = FareRepository
-
-    suspend fun calculateFareEstimate(
-        distance: Double,
-        isPeakHour: Boolean,
-        isRainyDay: Boolean
-    ): FareEstimateState {
-        return try {
-            // Base rate: 50 KES base + 30 KES per km
-            val baseFare = 50.0 + (distance * 30.0)
-            
-            // Peak hour: 20% increase
-            val peakHourFare = if (isPeakHour) baseFare * 1.2 else baseFare
-            
-            // Rainy day: additional 30% on top of peak/non-peak
-            val rainyDayFare = if (isRainyDay) peakHourFare * 1.3 else peakHourFare
-            
-            // Student discount: 20% off final fare
-            val discountedFare = rainyDayFare * 0.8
-
-            FareEstimateState.Success(
-                baseFare = baseFare,
-                peakHourFare = peakHourFare,
-                rainyDayFare = rainyDayFare,
-                discountedFare = discountedFare
-            )
-        } catch (e: Exception) {
-            FareEstimateState.Error("Error calculating fare: ${e.message}")
-        }
-    }
-}
-import java.io.IOException
 import android.graphics.Color as AndroidColor
 import java.text.DecimalFormat
 
 @Composable
-fun MatatuEstimateScreen(
-    navController: NavController = rememberNavController(),
-    userId: String = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-) {
-    Log.d("MatatuEstimateScreen", "Screen loaded with userId: $userId")
+fun MatatuEstimateScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-    var userLocation by remember { mutableStateOf<org.osmdroid.util.GeoPoint?>(null) }
-    var destinationLocation by remember { mutableStateOf<org.osmdroid.util.GeoPoint?>(null) }
-    var routePoints by remember { mutableStateOf<List<org.osmdroid.util.GeoPoint>>(emptyList()) }
+    var userLocation by remember { mutableStateOf<GeoPoint?>(null) }
+    var destinationLocation by remember { mutableStateOf<GeoPoint?>(null) }
+    var routePoints by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
     var locationPermissionGranted by remember { mutableStateOf(false) }
     var startDestination by remember { mutableStateOf("") }
     var destination by remember { mutableStateOf("") }
-    var startingLocation by remember { mutableStateOf<org.osmdroid.util.GeoPoint?>(null) }
+    var startingLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var directLine by remember { mutableStateOf<List<org.osmdroid.util.GeoPoint>?>(null) }
+    var directLine by remember { mutableStateOf<List<GeoPoint>?>(null) }
     var mapView by remember { mutableStateOf<MapView?>(null) }
 
     // Auto-suggestion states
@@ -135,10 +81,7 @@ fun MatatuEstimateScreen(
     var routeDistance by remember { mutableStateOf<Double?>(null) }
     var routeDuration by remember { mutableStateOf<Double?>(null) }
     var routeDirections by remember { mutableStateOf<List<String>>(emptyList()) }
-    var fareEstimateState by remember { mutableStateOf<FareEstimateState>(FareEstimateState.Initial) }
-    val fareEstimateRepository = remember { FareEstimateRepository() }
-    val scope = rememberCoroutineScope()
-    
+
     // Preload GTFS data when the screen is first shown
     LaunchedEffect(Unit) {
         try {
@@ -150,110 +93,27 @@ fun MatatuEstimateScreen(
         }
     }
 
-    // Location permission state
-    var showPermissionDialog by remember { mutableStateOf(false) }
-
-    // Permission dialog
-    if (showPermissionDialog) {
-        AlertDialog(
-            onDismissRequest = { showPermissionDialog = false },
-            title = { Text("Location Permission Required") },
-            text = { Text("This app needs location permission to find your current location and provide accurate fare estimates. Please grant location permission to continue.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showPermissionDialog = false
-                        permissionsLauncher.launch(arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        ))
-                    }
-                ) {
-                    Text("Grant Permission")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPermissionDialog = false }) {
-                    Text("Not Now")
-                }
-            }
-        )
-    }
-
-    // Multiple permissions launcher
-    val permissionsLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val fineLocationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val coarseLocationGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        
-        locationPermissionGranted = fineLocationGranted || coarseLocationGranted
-        if (locationPermissionGranted) {
-            // Start location updates with high accuracy if fine location is granted
-            requestLocationUpdate(context, fusedLocationClient, fineLocationGranted) { location ->
-                userLocation = location
-                startingLocation = location
-                
-                // Update map center to user location
-                mapView?.let { map ->
-                    map.controller?.let { controller ->
-                        controller.setCenter(org.osmdroid.util.GeoPoint(location.latitude, location.longitude))
-                        controller.setZoom(15.0)
-                    }
-                }
-                
-                Toast.makeText(
-                    context, 
-                    if (fineLocationGranted) "📍 Precise location found" else "📍 Approximate location found", 
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        } else {
-            showPermissionDialog = true
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        locationPermissionGranted = isGranted
+        if (isGranted) {
+            fetchUserLocation(context, fusedLocationClient) { userLocation = it }
         }
     }
 
     LaunchedEffect(Unit) {
-        val hasFineLocation = ContextCompat.checkSelfPermission(
-            context, 
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        
-        val hasCoarseLocation = ContextCompat.checkSelfPermission(
-            context, 
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        when {
-            hasFineLocation || hasCoarseLocation -> {
-                locationPermissionGranted = true
-                requestLocationUpdate(context, fusedLocationClient, hasFineLocation) { location ->
-                    userLocation = location
-                    startingLocation = location
-                    
-                    mapView?.controller?.let { controller ->
-                        controller.setCenter(org.osmdroid.util.GeoPoint(location.latitude, location.longitude))
-                        controller.setZoom(15.0)
-                    }
-                    
-                    Toast.makeText(
-                        context, 
-                        if (hasFineLocation) "📍 Precise location found" else "📍 Approximate location found", 
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            locationPermissionGranted = true
+            fetchUserLocation(context, fusedLocationClient) { location ->
+                userLocation = location
+                // Set the user's location as default starting point
+                startingLocation = location
             }
-            else -> {
-                // Show permission dialog
-                showPermissionDialog = true
-            }
-        }
-            }
-            // Request permissions if we don't have them
-            else -> {
-                // Show permission dialog first
-                showPermissionDialog = true
-            }
+        } else {
+            permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
@@ -277,35 +137,6 @@ fun MatatuEstimateScreen(
         routeDistance = directDistanceInMeters / 1000 // Convert to kilometers for display
         routeDuration = (directDistanceInMeters / 1000) / 40 * 60 // Rough estimate: 40 km/h average speed, converted to minutes
         routeDirections = listOf("Direct route between points")
-        
-        // Calculate fare estimate
-        fareEstimateState = FareEstimateState.Loading
-        scope.launch {
-            try {
-                val isPeakHour = Calendar.getInstance().let { calendar ->
-                    val hour = calendar.get(Calendar.HOUR_OF_DAY)
-                    val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
-                    val isMondayToFriday = dayOfWeek in Calendar.MONDAY..Calendar.FRIDAY
-                    val isMorningPeak = hour in 6..9
-                    val isEveningPeak = hour in 16..19
-                    isMondayToFriday && (isMorningPeak || isEveningPeak)
-                }
-                
-                fareEstimateRepository.getFareEstimateForRoute(
-                    startPoint = start,
-                    endPoint = end,
-                    distance = routeDistance!!,
-                    isPeakHour = isPeakHour
-                ).onSuccess { estimate ->
-                    fareEstimateState = FareEstimateState.Success(estimate)
-                }.onFailure { error ->
-                    fareEstimateState = FareEstimateState.Error(error.message ?: "Unknown error")
-                }
-            } catch (e: Exception) {
-                Log.e("FareEstimate", "Error calculating fare: ${e.message}")
-                fareEstimateState = FareEstimateState.Error("Error calculating fare")
-            }
-        }
 
         val url = "https://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson&steps=true"
         val client = OkHttpClient.Builder()
@@ -361,24 +192,17 @@ fun MatatuEstimateScreen(
                                     val steps = firstLeg.getJSONArray("steps")
                                     for (i in 0 until steps.length()) {
                                         val step = steps.getJSONObject(i)
-                                        val maneuver = step.getJSONObject("maneuver")
-                                        val type = if (maneuver.has("type")) maneuver.getString("type") else "continue"
-                                        val modifier = if (maneuver.has("modifier")) maneuver.getString("modifier") else ""
-                                        val name = if (step.has("name")) step.getString("name") else "the road"
-                                        val distance = if (step.has("distance")) step.getDouble("distance") else 0.0
-                                        
-                                        val instruction = when (type) {
-                                            "turn" -> "Turn $modifier onto $name (${String.format("%.0f", distance)}m)"
-                                            "depart" -> "Start on $name"
-                                            "arrive" -> "🏁 Arrive at destination"
-                                            "new name" -> "Continue onto $name (${String.format("%.0f", distance)}m)"
-                                            "roundabout" -> "Take the roundabout and exit onto $name"
-                                            "merge" -> "Merge ${modifier} onto $name (${String.format("%.0f", distance)}m)"
-                                            "fork" -> "Take the $modifier fork onto $name"
-                                            "ramp" -> "Take the ramp $modifier onto $name"
-                                            else -> "Continue on $name (${String.format("%.0f", distance)}m)"
+                                        if (step.has("maneuver") && step.getJSONObject("maneuver").has("instruction")) {
+                                            directions.add(step.getJSONObject("maneuver").getString("instruction"))
+                                        } else {
+                                            // If no instruction, use type and modifier as fallback
+                                            if (step.has("maneuver")) {
+                                                val maneuver = step.getJSONObject("maneuver")
+                                                val type = if (maneuver.has("type")) maneuver.getString("type") else "continue"
+                                                val modifier = if (maneuver.has("modifier")) maneuver.getString("modifier") else ""
+                                                directions.add("${type.capitalize()} ${modifier}")
+                                            }
                                         }
-                                        directions.add(instruction)
                                     }
                                 }
                             }
@@ -391,7 +215,7 @@ fun MatatuEstimateScreen(
                                 for (i in 0 until coordinates.length()) {
                                     val point = coordinates.getJSONArray(i)
                                     // Note: GeoJSON format has [longitude, latitude] order
-                                    points.add(org.osmdroid.util.GeoPoint(point.getDouble(1), point.getDouble(0)))
+                                    points.add(GeoPoint(point.getDouble(1), point.getDouble(0)))
                                 }
 
                                 // Update UI on the main thread
@@ -411,26 +235,6 @@ fun MatatuEstimateScreen(
                                     routeDirections = directions
                                     isLoading = false
                                     Log.d("ROUTE_INFO", "Distance: ${distanceInMeters/1000} km, Duration: ${durationInSeconds/60} min")
-                                    
-                                    // Calculate and zoom to route bounds
-                                    val minLat = points.minOf { it.latitude }
-                                    val maxLat = points.maxOf { it.latitude }
-                                    val minLon = points.minOf { it.longitude }
-                                    val maxLon = points.maxOf { it.longitude }
-                                    
-                                    val bounds = org.osmdroid.util.BoundingBox(
-                                        maxLat + 0.001, // Add some padding
-                                        maxLon + 0.001,
-                                        minLat - 0.001,
-                                        minLon - 0.001
-                                    )
-                                    
-                                    // Safely zoom the map
-                                    mapView?.let { map ->
-                                        map.post {
-                                            map.zoomToBoundingBox(bounds, true)
-                                        }
-                                    }
 
                                     // Show a success toast
                                     Toast.makeText(context, "Route loaded successfully", Toast.LENGTH_SHORT).show()
@@ -557,14 +361,14 @@ fun MatatuEstimateScreen(
                     } else {
                         // Otherwise use the geocoding process as before
                         // Get coordinates for starting point
-                        geocodeAddress(startDestination, context) { startLocation ->
+                        fetchCoordinates(startDestination, context) { startLocation ->
                             if (startLocation != null) {
                                 Log.d("ROUTE_SEARCH", "Found starting location: ${startLocation.latitude}, ${startLocation.longitude}")
                                 startingLocation = startLocation
 
                                 // Get coordinates for destination
                                 if (destination.isNotEmpty()) {
-                                    geocodeAddress(destination, context) { destLocation ->
+                                    fetchCoordinates(destination, context) { destLocation ->
                                         if (destLocation != null) {
                                             Log.d("ROUTE_SEARCH", "Found destination: ${destLocation.latitude}, ${destLocation.longitude}")
                                             destinationLocation = destLocation
@@ -598,7 +402,7 @@ fun MatatuEstimateScreen(
                         startingLocation = userLocation
                         fetchRoute(userLocation!!, destinationLocation!!)
                     } else {
-                        geocodeAddress(destination, context) { destLocation ->
+                        fetchCoordinates(destination, context) { destLocation ->
                             if (destLocation != null) {
                                 Log.d("ROUTE_SEARCH", "Found destination: ${destLocation.latitude}, ${destLocation.longitude}")
                                 destinationLocation = destLocation
@@ -834,12 +638,6 @@ fun MatatuEstimateScreen(
                                             } else {
                                                 ""
                                             }
-                                            val fareText = when (fareEstimateState) {
-                                                is FareEstimateState.Success -> "Estimated Fare: KES ${(fareEstimateState as FareEstimateState.Success).amount.toInt()}"
-                                                is FareEstimateState.Error -> "No Estimate available yet"
-                                                FareEstimateState.Loading -> "Calculating..."
-                                                FareEstimateState.Initial -> ""
-                                            }
 
                                             // Measure text
                                             val distanceBounds = android.graphics.Rect()
@@ -855,22 +653,8 @@ fun MatatuEstimateScreen(
                                             val margin = 20f
                                             val spacing = 12f
 
-                                            // Measure fare text first
-                                            val fareBounds = android.graphics.Rect()
-                                            if (fareText.isNotEmpty()) {
-                                                textPaint.getTextBounds(fareText, 0, fareText.length, fareBounds)
-                                            }
-
-                                            val boxWidth = listOf(
-                                                distanceBounds.width(),
-                                                timeBounds.width(),
-                                                if (fareText.isNotEmpty()) fareBounds.width() else 0
-                                            ).maxOrNull()!! + (padding * 2)
-                                            
-                                            val boxHeight = distanceBounds.height() + 
-                                                (if (timeText.isNotEmpty()) timeBounds.height() + spacing else 0f) +
-                                                (if (fareText.isNotEmpty()) fareBounds.height() + spacing else 0f) +
-                                                (padding * 2)
+                                            val boxWidth = Math.max(distanceBounds.width(), timeBounds.width()) + (padding * 2)
+                                            val boxHeight = distanceBounds.height() + (if (timeText.isNotEmpty()) timeBounds.height() + spacing else 0f) + (padding * 2)
 
                                             // Position at bottom left with margin
                                             val rect = android.graphics.RectF(
@@ -891,34 +675,6 @@ fun MatatuEstimateScreen(
                                                 rect.top + padding + distanceBounds.height(),
                                                 textPaint
                                             )
-
-                                            // Draw time text if available
-                                            if (timeText.isNotEmpty()) {
-                                                canvas.drawText(
-                                                    timeText,
-                                                    rect.left + padding,
-                                                    rect.top + padding + distanceBounds.height() + spacing + timeBounds.height(),
-                                                    smallTextPaint
-                                                )
-                                            }
-
-                                            // Draw fare text if available
-                                            if (fareText.isNotEmpty()) {
-                                                val textPaintToUse = when (fareEstimateState) {
-                                                    is FareEstimateState.Error -> smallTextPaint.apply { color = android.graphics.Color.RED }
-                                                    is FareEstimateState.Success -> textPaint.apply { isFakeBoldText = true }
-                                                    else -> textPaint
-                                                }
-                                                
-                                                canvas.drawText(
-                                                    fareText,
-                                                    rect.left + padding,
-                                                    rect.top + padding + distanceBounds.height() + 
-                                                        (if (timeText.isNotEmpty()) timeBounds.height() + spacing else 0f) +
-                                                        fareBounds.height(),
-                                                    textPaintToUse
-                                                )
-                                            }
 
                                             // Draw time text if available
                                             if (timeText.isNotEmpty()) {
@@ -992,7 +748,7 @@ fun MatatuEstimateScreen(
 
         // Pay Button
         Button(
-            onClick = { 
+            onClick = {
                 val auth = FirebaseAuth.getInstance()
                 val userId = auth.currentUser?.uid
                 if (userId != null) {
@@ -1037,40 +793,34 @@ fun fetchUserLocation(context: Context, fusedLocationClient: FusedLocationProvid
     }
 }
 
-// Geocoding handler class
-private fun geocodeAddress(
-    address: String,
-    context: Context,
-    onResult: (org.osmdroid.util.GeoPoint?) -> Unit
-) {
-    if (address.isBlank()) {
-        onResult(null)
-        return
-    }
-
-    val geocoder = android.location.Geocoder(context)
-    val scope = CoroutineScope(Dispatchers.IO + Job())
-    
-    scope.launch {
-        try {
-            val addresses = geocoder.getFromLocationName(address, 1)
-            withContext(Dispatchers.Main) {
-                if (!addresses.isNullOrEmpty()) {
-                    val location = addresses[0]
-                    val geoPoint = org.osmdroid.util.GeoPoint(location.latitude, location.longitude)
-                    onResult(geoPoint)
-                } else {
+fun fetchCoordinates(destination: String, context: Context, onResult: (GeoPoint?) -> Unit) {
+    Log.d("GEOCODE", "Geocoding address: $destination")
+    try {
+        val geocoder = android.location.Geocoder(context)
+        // Use getFromLocationName in a background thread to avoid NetworkOnMainThreadException
+        Thread {
+            try {
+                val addresses = geocoder.getFromLocationName(destination, 1)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    if (addresses?.isNotEmpty() == true) {
+                        val address = addresses[0]
+                        Log.d("GEOCODE", "Found location for '$destination': ${address.latitude}, ${address.longitude}")
+                        onResult(GeoPoint(address.latitude, address.longitude))
+                    } else {
+                        Log.e("GEOCODE", "No location found for '$destination'")
+                        onResult(null)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("GEOCODE", "Error geocoding address: ${e.message}", e)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
                     onResult(null)
                 }
             }
-        } catch (e: Exception) {
-            Log.e("Geocoding", "Error: ${e.message}")
-            withContext(Dispatchers.Main) {
-                onResult(null)
-            }
-        } finally {
-            scope.cancel() // Clean up the scope
-        }
+        }.start()
+    } catch (e: Exception) {
+        Log.e("GEOCODE", "Error initializing geocoder: ${e.message}", e)
+        onResult(null)
     }
 }
 
@@ -1289,7 +1039,7 @@ fun getGtfsStopsFromFile(context: Context): List<GtfsStopSuggestion> {
                         if (parts.size >= 5) {
                             try {
                                 val stopId = parts[0].trim()
-                                val stopCode = parts[1].trim().ifEmpty { stopId } 
+                                val stopCode = parts[1].trim().ifEmpty { stopId }
                                 val stopName = parts[2].trim()
                                 val stopLat = parts[3].trim().toDoubleOrNull() ?: 0.0
                                 val stopLon = parts[4].trim().toDoubleOrNull() ?: 0.0
@@ -1325,7 +1075,7 @@ fun getGtfsStopsFromFile(context: Context): List<GtfsStopSuggestion> {
         Log.d("GTFS_DEBUG", "No stops loaded from file, using sample stops as fallback")
         return getSampleStops()
     }
-    
+
     return stops
 }
 
@@ -1345,49 +1095,6 @@ fun getSampleStops(): List<GtfsStopSuggestion> {
     )
 }
 
-// Location handling class to avoid type ambiguity
-@SuppressLint("MissingPermission")
-private fun requestLocationUpdate(
-    context: Context,
-    fusedLocationClient: FusedLocationProviderClient,
-    useHighAccuracy: Boolean,
-    onLocationReceived: (org.osmdroid.util.GeoPoint) -> Unit
-) {
-    try {
-        // First try to get last known location
-        fusedLocationClient.lastLocation.addOnSuccessListener { lastLocation ->
-            if (lastLocation != null) {
-                onLocationReceived(org.osmdroid.util.GeoPoint(lastLocation.latitude, lastLocation.longitude))
-            }
-        }
-
-        // Then request fresh location updates
-        val request = LocationRequest.Builder(2000L).apply {
-            setPriority(if (useHighAccuracy) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY)
-            setMinUpdateDistanceMeters(5f)
-            setMinUpdateIntervalMillis(1000L)
-            setMaxUpdateDelayMillis(5000L)
-            setWaitForAccurateLocation(useHighAccuracy)
-        }.build()
-
-        val callback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let { location ->
-                    if (location.accuracy <= (if (useHighAccuracy) 20f else 50f)) {
-                        onLocationReceived(org.osmdroid.util.GeoPoint(location.latitude, location.longitude))
-                        fusedLocationClient.removeLocationUpdates(this)
-                    }
-                }
-            }
-        }
-
-        fusedLocationClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
-    } catch (e: Exception) {
-        Log.e("Location", "Error getting location: ${e.message}")
-        Toast.makeText(context, "Could not get your location. Please check your GPS settings.", Toast.LENGTH_LONG).show()
-    }
-}
-
 // Helper function to calculate distance between two points using Haversine formula
 public fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6371e3 // Earth radius in meters
@@ -1404,21 +1111,8 @@ public fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Dou
     return r * c // Distance in meters
 }
 
-private fun isCurrentTimePeakHour(): Boolean {
-    val calendar = java.util.Calendar.getInstance()
-    val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
-    val dayOfWeek = calendar.get(java.util.Calendar.DAY_OF_WEEK)
-    
-    // Define peak hours (Monday to Friday)
-    val isMondayToFriday = dayOfWeek in java.util.Calendar.MONDAY..java.util.Calendar.FRIDAY
-    val isMorningPeak = hour in 6..9 // 6 AM to 9 AM
-    val isEveningPeak = hour in 16..19 // 4 PM to 7 PM
-    
-    return isMondayToFriday && (isMorningPeak || isEveningPeak)
-}
-
 @Preview(showBackground = true)
 @Composable
-private fun MatatuEstimateScreenPreview() {
+fun MatatuEstimateScreenPreview() {
     MatatuEstimateScreen()
 }

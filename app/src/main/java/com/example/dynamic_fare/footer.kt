@@ -22,6 +22,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.dynamic_fare.R
 import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 
 @Composable
 fun FooterWithIcons(
@@ -89,11 +90,41 @@ fun FooterWithIcons(
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
-                        val userId = FirebaseAuth.getInstance().currentUser?.uid
-                        if (userId != null) {
-                            navController.navigate(Routes.accessibilitySettingsRoute(userId)) {
-                                launchSingleTop = true
+                        try {
+                            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+                            if (currentUserId != null) {
+                                // First ensure settings exist
+                                FirebaseDatabase.getInstance()
+                                    .getReference("userSettings")
+                                    .child(currentUserId)
+                                    .get()
+                                    .addOnSuccessListener { snapshot ->
+                                        if (!snapshot.exists()) {
+                                            // Initialize settings if they don't exist
+                                            val initialSettings = mapOf(
+                                                "userId" to currentUserId,
+                                                "isDisabled" to false,
+                                                "notificationsEnabled" to true,
+                                                "lastUpdated" to System.currentTimeMillis()
+                                            )
+                                            FirebaseDatabase.getInstance()
+                                                .getReference("userSettings")
+                                                .child(currentUserId)
+                                                .setValue(initialSettings)
+                                        }
+                                        // Navigate to settings
+                                        navController.navigate(Routes.accessibilitySettingsRoute(currentUserId)) {
+                                            launchSingleTop = true
+                                        }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Log.e("Footer", "Error checking settings: ${e.message}")
+                                    }
+                            } else {
+                                Log.e("Footer", "No user logged in")
                             }
+                        } catch (e: Exception) {
+                            Log.e("Footer", "Error navigating to settings: ${e.message}")
                         }
                     }
             )

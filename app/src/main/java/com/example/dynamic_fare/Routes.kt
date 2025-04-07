@@ -172,7 +172,7 @@ fun AppNavigation(
             arguments = listOf(navArgument("userId") { type = NavType.StringType })
         ) { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
-            NotificationsScreen(navController, userId)
+            PaymentHistoryScreen(navController, userId)
         }
 
         composable(
