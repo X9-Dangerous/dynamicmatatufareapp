@@ -12,7 +12,7 @@ import com.example.dynamic_fare.Routes
 @Composable
 fun BottomNavigationBar(navController: NavController, userId: String, currentRoute: String?) {
     val items = listOf(
-        BottomNavItem("Home", Icons.Default.Home, Routes.homeRoute(userId)),
+        BottomNavItem("Home", Icons.Default.Home, Routes.operatorHomeRoute(userId)),
         BottomNavItem("Profile", Icons.Default.Person, Routes.profileRoute(userId)),
         BottomNavItem("Settings", Icons.Default.Settings, Routes.settingsRoute(userId))
     )
