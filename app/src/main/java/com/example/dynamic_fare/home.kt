@@ -23,11 +23,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.ui.text.font.FontWeight as ComposeTextFontWeight
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,11 +46,13 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.location.*
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 import okhttp3.*
 import org.json.JSONObject
 import org.osmdroid.config.Configuration
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import java.util.Calendar
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import java.io.IOException
@@ -117,6 +121,10 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
         }
     }
 
+    var estimatedFare by remember { mutableStateOf<EstimatedFare?>(null) }
+    val fareEstimator = remember { FareEstimator() }
+    val scope = rememberCoroutineScope()
+
     fun fetchRoute(start: GeoPoint, end: GeoPoint) {
         Log.d("ROUTE_FETCH", "Fetching route from ${start.latitude},${start.longitude} to ${end.latitude},${end.longitude}")
         isLoading = true
@@ -125,18 +133,35 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
         // Set up direct line as fallback
         directLine = listOf(start, end)
 
-        // Note: We're not initializing routePoints here anymore
-        // to ensure we don't override the API response points
-        // with just start and end
-
-        // Log attempt to fetch route
-        Log.d("ROUTE_FETCH_DETAIL", "Attempting to fetch route with ${start.latitude},${start.longitude} -> ${end.latitude},${end.longitude}")
-
-        // Calculate direct distance as fallback
+        // Calculate direct distance
         val directDistanceInMeters = calculateDistance(start.latitude, start.longitude, end.latitude, end.longitude)
         routeDistance = directDistanceInMeters / 1000 // Convert to kilometers for display
         routeDuration = (directDistanceInMeters / 1000) / 40 * 60 // Rough estimate: 40 km/h average speed, converted to minutes
-        routeDirections = listOf("Direct route between points")
+
+        // Get fare estimate
+        scope.launch {
+            try {
+                val weatherManager = WeatherManager("d77ed3bf47a3594d4053bb96e601958f")
+                // Check peak hours
+                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                val isPeakTime = hour in 6..9 || hour in 16..20
+                var isRaining = false
+                weatherManager.fetchWeather("Nairobi") { isRainy ->
+                    isRaining = isRainy
+                }
+                estimatedFare = fareEstimator.estimateFare(
+                    startLat = start.latitude,
+                    startLon = start.longitude,
+                    endLat = end.latitude,
+                    endLon = end.longitude,
+                    isRainyWeather = isRaining,
+                    isPeakHour = isPeakTime,
+                    routeDistance = routeDistance ?: 0.0
+                )
+            } catch (e: Exception) {
+                Log.e("FARE_ESTIMATE", "Error estimating fare: ${e.message}")
+            }
+        }
 
         val url = "https://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson&steps=true"
         val client = OkHttpClient.Builder()
@@ -283,13 +308,73 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Title
-        Text(
-            text = "Fare Estimate",
-            fontSize = 25.sp,
-            color = Color.Black,
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-        )
+        // Title and Fare Card
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Fare Estimate",
+                fontSize = 25.sp,
+                color = Color.Black
+            )
+            
+            if (estimatedFare != null) {
+                Card(
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .weight(1f),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = "KES ${String.format("%.0f", estimatedFare?.avgFare)}",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Range: ${String.format("%.0f", estimatedFare?.minFare)} - ${String.format("%.0f", estimatedFare?.maxFare)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (estimatedFare?.isPeakHour == true) {
+                                Icon(
+                                    imageVector = Icons.Default.Timeline,
+                                    contentDescription = "Peak Hours",
+                                    tint = Color.Red,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            if (estimatedFare?.isRainyWeather == true) {
+                                Icon(
+                                    imageVector = Icons.Default.WaterDrop,
+                                    contentDescription = "Rainy Weather",
+                                    tint = Color.Blue,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(5.dp))
 
