@@ -17,6 +17,9 @@ import androidx.compose.material3.Tab
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import com.example.dynamic_fare.SetFaresActivity
 import com.example.dynamic_fare.data.FareRepository
 import com.example.dynamic_fare.models.MatatuFares
@@ -24,6 +27,8 @@ import com.example.dynamic_fare.models.MatatuFares
 class FareTabbedActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Make content draw behind system bars
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val matatuId = intent.getStringExtra("matatuId") ?: "" // Get matatuId from Intent
 
@@ -39,7 +44,10 @@ fun FareTabbedScreen(navController: NavController, matatuId: String) {
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("Matatu Details", "Fare Details")
 
-    Column {
+    Column(
+        modifier = Modifier
+            .statusBarsPadding() // Add padding for the status bar
+    ) {
         TabRow(selectedTabIndex = selectedTabIndex) {
             tabs.forEachIndexed { index, title ->
                 Tab(
@@ -183,45 +191,184 @@ fun FareDetailsScreen(matatuId: String) {
         }
     }
 
-    Column(modifier = Modifier.padding(16.dp)) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text(
+                text = "Fare Details",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.Black,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+
         if (isLoading) {
-            CircularProgressIndicator()
-            Text("Loading fare details...", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-        } else if (fareData == null) {
-            Text("No fare data found for this matatu.", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = {
-                    val intent = Intent(context, SetFaresActivity::class.java).apply {
-                        putExtra("matatuId", matatuId)
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = Color.Black)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "Loading fare details...", 
+                            style = MaterialTheme.typography.bodyLarge, 
+                            color = Color.Black
+                        )
                     }
-                    context.startActivity(intent)
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Black,
-                    contentColor = Color.White
-                )
-            ) {
-                Text("Set Fares")
+                }
+            }
+        } else if (fareData == null) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFAFAFA))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "No fare data found for this matatu.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.Black,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        
+                        Button(
+                            onClick = {
+                                val intent = Intent(context, SetFaresActivity::class.java).apply {
+                                    putExtra("matatuId", matatuId)
+                                }
+                                context.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Black,
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            Text("Set Fares", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                        }
+                    }
+                }
             }
         } else {
-            // Ensure displayed values are not null
-            Text("Peak Fare: Ksh ${fareData?.peakFare ?: ""}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-            Text("Off-Peak Fare: Ksh ${fareData?.nonPeakFare ?: ""}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-            Text("Rainy Peak Fare: Ksh ${fareData?.rainyPeakFare ?: ""}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-            Text("Rainy Off-Peak Fare: Ksh ${fareData?.rainyNonPeakFare ?: ""}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-            Text("♿ Disability Discount: ${fareData?.disabilityDiscount ?: ""}%", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(onClick = {
-                val intent = Intent(context, SetFaresActivity::class.java)
-                intent.putExtra("matatuId", matatuId)
-                context.startActivity(intent)
-            }) {
-                Text("✏️ Update Fares")
+            // Standard Fares Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "Standard Fares",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.Black,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        
+                        FareRow("Peak Hours", "Ksh ${fareData?.peakFare ?: ""}")
+                        Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+                        FareRow("Off-Peak Hours", "Ksh ${fareData?.nonPeakFare ?: ""}")
+                    }
+                }
+            }
+            
+            // Rainy Weather Fares Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "Rainy Weather Fares",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.Black,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        
+                        FareRow("Peak Hours", "Ksh ${fareData?.rainyPeakFare ?: ""}")
+                        Divider(color = Color(0xFFBBDEFB), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+                        FareRow("Off-Peak Hours", "Ksh ${fareData?.rainyNonPeakFare ?: ""}")
+                    }
+                }
+            }
+            
+            // Disability Discount Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FBE7))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "♿ Disability Discount", 
+                            style = MaterialTheme.typography.titleMedium, 
+                            color = Color.Black
+                        )
+                        Text(
+                            "${fareData?.disabilityDiscount ?: ""}%", 
+                            style = MaterialTheme.typography.titleLarge, 
+                            color = Color(0xFF558B2F)
+                        )
+                    }
+                }
+            }
+            
+            // Update Button
+            item {
+                Button(
+                    onClick = {
+                        val intent = Intent(context, SetFaresActivity::class.java).apply {
+                            putExtra("matatuId", matatuId)
+                        }
+                        context.startActivity(intent)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Black,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Text("✏️ Update Fares", modifier = Modifier.padding(vertical = 8.dp))
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun FareRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = Color.DarkGray)
+        Text(
+            value, 
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black
+        )
     }
 }
 
