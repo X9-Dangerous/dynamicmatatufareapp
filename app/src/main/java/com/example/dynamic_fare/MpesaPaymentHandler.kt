@@ -43,7 +43,7 @@ object MpesaPaymentHandler {
                     callback(success, message)
                 }
             }
-            "till" -> {
+            "till number" -> {
                 val tillNumber = mpesaDetails["tillNumber"]
                 if (tillNumber.isNullOrEmpty()) {
                     callback(false, "Till number not found")
@@ -78,7 +78,7 @@ object MpesaPaymentHandler {
                 }
             }
             else -> {
-                callback(false, "Unsupported payment method: $mpesaOption")
+                callback(false, "Unsupported payment method: $mpesaOption. Must be one of: Send Money, Till Number, Paybill, or Pochi la Biashara")
             }
         }
     }

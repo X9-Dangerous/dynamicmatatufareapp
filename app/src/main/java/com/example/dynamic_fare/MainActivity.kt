@@ -219,6 +219,14 @@ class MainActivity : ComponentActivity() {
                         PaymentHistoryScreen(navController = navController, userId = userId)
                     }
 
+                    composable(
+                        route = "accessibility/{userId}",
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                        AccessibilitySettingsScreen(navController = navController, userId = userId)
+                    }
+
                 }
             }
         }
