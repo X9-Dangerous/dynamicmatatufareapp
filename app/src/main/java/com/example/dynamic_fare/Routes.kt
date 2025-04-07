@@ -38,6 +38,7 @@ object Routes {
     const val NotificationsScreen = "notifications/{userId}"
     const val SettingsScreen = "settings/{userId}"
     const val AccessibilitySettingsScreen = "accessibility/{userId}"
+    const val ClientProfileScreen = "clientProfile/{userId}"
 
     fun operatorHomeRoute(operatorId: String): String = "operatorHomeScreen/$operatorId"
     fun homeRoute(userId: String): String = "home/$userId"
@@ -49,6 +50,7 @@ object Routes {
     fun profileRoute(userId: String): String = "profile/$userId"
     fun paymentPageWithQRCode(scannedQRCode: String): String = "paymentPage/$scannedQRCode"
     fun notificationsRoute(userId: String): String = "notifications/$userId"
+    fun clientProfileRoute(userId: String): String = "clientProfile/$userId"
     fun settingsRoute(userId: String): String = "settings/$userId"
     fun accessibilitySettingsRoute(userId: String): String = "accessibility/$userId"
 }

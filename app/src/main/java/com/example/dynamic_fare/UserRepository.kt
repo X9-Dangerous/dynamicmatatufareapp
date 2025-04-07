@@ -47,17 +47,21 @@ class UserRepository {
 
     suspend fun fetchUserData(userId: String): Result<UserData> {
         return try {
-            val userDoc = firestore.collection("users").document(userId).get().await()
-            if (userDoc.exists()) {
+            Log.d("UserRepository", "Attempting to fetch user data for userId: $userId")
+            val snapshot = database.child(userId).get().await()
+            
+            if (snapshot.exists()) {
                 val userData = UserData(
-                    name = userDoc.getString("name") ?: "",
-                    email = userDoc.getString("email") ?: "",
-                    phoneNumber = userDoc.getString("phoneNumber") ?: "",
-                    role = userDoc.getString("role") ?: "",
-                    profilePicUrl = userDoc.getString("profilePicUrl")
+                    name = snapshot.child("name").getValue(String::class.java) ?: "",
+                    email = snapshot.child("email").getValue(String::class.java) ?: "",
+                    phoneNumber = snapshot.child("phoneNumber").getValue(String::class.java) ?: "",
+                    role = snapshot.child("role").getValue(String::class.java) ?: "",
+                    profilePicUrl = snapshot.child("profilePicUrl").getValue(String::class.java)
                 )
+                Log.d("UserRepository", "Successfully fetched user data: $userData")
                 Result.success(userData)
             } else {
+                Log.e("UserRepository", "User not found for userId: $userId")
                 Result.failure(Exception("User not found"))
             }
         } catch (e: Exception) {
@@ -68,15 +72,19 @@ class UserRepository {
 
     suspend fun fetchOperatorData(userId: String): Result<OperatorData> {
         return try {
-            val operatorDoc = firestore.collection("operators").document(userId).get().await()
-            if (operatorDoc.exists()) {
+            Log.d("UserRepository", "Attempting to fetch operator data for userId: $userId")
+            val snapshot = database.child(userId).get().await()
+            
+            if (snapshot.exists() && snapshot.child("role").getValue(String::class.java) == "Matatu Operator") {
                 val operatorData = OperatorData(
-                    businessName = operatorDoc.getString("businessName") ?: "",
-                    businessAddress = operatorDoc.getString("businessAddress") ?: "",
-                    licenseNumber = operatorDoc.getString("licenseNumber") ?: ""
+                    businessName = snapshot.child("businessName").getValue(String::class.java) ?: "",
+                    businessAddress = snapshot.child("businessAddress").getValue(String::class.java) ?: "",
+                    licenseNumber = snapshot.child("licenseNumber").getValue(String::class.java) ?: ""
                 )
+                Log.d("UserRepository", "Successfully fetched operator data: $operatorData")
                 Result.success(operatorData)
             } else {
+                Log.e("UserRepository", "Operator data not found for userId: $userId")
                 Result.failure(Exception("Operator data not found"))
             }
         } catch (e: Exception) {

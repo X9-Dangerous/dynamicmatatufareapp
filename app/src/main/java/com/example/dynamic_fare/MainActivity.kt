@@ -17,6 +17,7 @@ import androidx.navigation.navArgument
 import com.example.dynamic_fare.ui.screens.RegistrationScreen
 import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.example.dynamic_fare.ui.screens.*
+import com.example.dynamic_fare.ClientProfileScreen
 import com.example.dynamic_fare.ui.ChooseFleetDialog
 import com.example.dynamic_fare.ui.FleetRegistrationScreen
 import com.example.dynamic_fare.MatatuEstimateScreen
@@ -140,6 +141,14 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable(
+                        route = Routes.ClientProfileScreen,
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                        ClientProfileScreen(navController = navController)
+                    }
+
+                    composable(
                         route = Routes.FareTabbedScreen,
                         arguments = listOf(navArgument("matatuId") { type = NavType.StringType })
                     ) { backStackEntry ->
@@ -200,6 +209,14 @@ class MainActivity : ComponentActivity() {
                                 fareManager.getMatatuIdFromRegistration(regNo, callback)
                             }
                         )
+                    }
+
+                    composable(
+                        route = Routes.NotificationsScreen,
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                        NotificationsScreen(navController = navController, userId = userId)
                     }
 
                 }

@@ -1,6 +1,7 @@
 package com.example.dynamic_fare
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -23,7 +24,11 @@ import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
-fun FooterWithIcons(navController: NavController) {
+fun FooterWithIcons(
+    navController: NavController,
+    userId: String = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+) {
+    Log.d("FooterWithIcons", "Footer loaded with userId: $userId")
     Column(modifier = Modifier.fillMaxSize()) {
         Spacer(modifier = Modifier.weight(1f)) // Push footer to the bottom
         Row(
@@ -41,8 +46,8 @@ fun FooterWithIcons(navController: NavController) {
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
-                        navController.navigate(Routes.MatatuEstimateScreen) {
-                            popUpTo("home") { inclusive = true }
+                        navController.navigate(Routes.homeRoute(userId)) {
+                            popUpTo(Routes.HomeScreen) { inclusive = true }
                             launchSingleTop = true
                         }
                     }
@@ -70,11 +75,9 @@ fun FooterWithIcons(navController: NavController) {
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
-                        val userId = FirebaseAuth.getInstance().currentUser?.uid
-                        if (userId != null) {
-                            navController.navigate(Routes.profileRoute(userId)) {
-                                launchSingleTop = true
-                            }
+                        Log.d("Footer", "Navigating to client profile with userId: $userId")
+                        navController.navigate(Routes.clientProfileRoute(userId)) {
+                            launchSingleTop = true
                         }
                     }
             )

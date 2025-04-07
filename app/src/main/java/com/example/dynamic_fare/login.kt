@@ -220,7 +220,8 @@ fun navigateByRole(navController: NavController, role: String?) {
             }
         }
         "Matatu Client" -> {
-            navController.navigate(Routes.matatuEstimateRoute()) {
+            Log.d("LoginScreen", "Navigating to client home with userId: $userId")
+            navController.navigate(Routes.homeRoute(userId)) {
                 popUpTo(Routes.LoginScreenContent) { inclusive = true }
             }
         }
