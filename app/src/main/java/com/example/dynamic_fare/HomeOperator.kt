@@ -68,7 +68,14 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
                 title = { Text("Operator Dashboard") },
                 actions = {
                     IconButton(onClick = {
-                        navController.navigate(Routes.registrationRoute(operatorId))
+                        // Navigate based on which tab is selected
+                        if (selectedTab == 0) {
+                            // Matatu tab - navigate to registration
+                            navController.navigate(Routes.registrationRoute(operatorId))
+                        } else {
+                            // Fleet tab - navigate to fleet registration
+                            navController.navigate(Routes.fleetRegistrationRoute(operatorId))
+                        }
                     }) {
                         Icon(Icons.Default.Add, contentDescription = "Add")
                     }

@@ -1,6 +1,7 @@
 package com.example.dynamic_fare.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,7 +30,7 @@ fun FleetRegistrationScreen(navController: NavController, operatorId: String) {
     var errorMessage by remember { mutableStateOf("") }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
+        modifier = Modifier.fillMaxSize().statusBarsPadding().padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Fleet Registration", fontSize = 24.sp, color = Color.Black)

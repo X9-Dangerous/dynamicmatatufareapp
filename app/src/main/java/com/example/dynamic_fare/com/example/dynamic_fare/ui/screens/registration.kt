@@ -50,6 +50,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.example.dynamic_fare.Routes
+import androidx.compose.foundation.layout.statusBarsPadding
 
 // Data class to hold GTFS stop suggestion
 data class GtfsStopSuggestion(
@@ -345,7 +346,7 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
         }
     )
 
-    Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(20.dp)) {
         if (!showMpesaPage) {
             Text("Matatu Registration", style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(20.dp))
