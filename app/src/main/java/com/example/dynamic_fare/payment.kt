@@ -34,6 +34,7 @@ fun PaymentPage(
     var paymentStatus by remember { mutableStateOf("") }
     var mpesaOption by remember { mutableStateOf<String?>(null) }
     var mpesaDetails by remember { mutableStateOf<Map<String, String>>(mapOf()) }
+    var phoneNumber by remember { mutableStateOf("") }
 
     // Fetch all required data in parallel
     LaunchedEffect(scannedQRCode) {
@@ -63,23 +64,27 @@ fun PaymentPage(
                 when (mpesaOption?.lowercase()) {
                     "pochi la biashara" -> {
                         mpesaDetails = mapOf(
-                            "pochiNumber" to (snapshot.child("pochiNumber").value?.toString() ?: "")
+                            "pochiNumber" to (snapshot.child("pochiNumber").value?.toString() ?: ""),
+                            "phoneNumber" to phoneNumber
                         )
                     }
                     "paybill" -> {
                         mpesaDetails = mapOf(
                             "paybillNumber" to (snapshot.child("paybillNumber").value?.toString() ?: ""),
-                            "accountNumber" to (snapshot.child("accountNumber").value?.toString() ?: "")
+                            "accountNumber" to (snapshot.child("accountNumber").value?.toString() ?: ""),
+                            "phoneNumber" to phoneNumber
                         )
                     }
                     "till number" -> {
                         mpesaDetails = mapOf(
-                            "tillNumber" to (snapshot.child("tillNumber").value?.toString() ?: "")
+                            "tillNumber" to (snapshot.child("tillNumber").value?.toString() ?: ""),
+                            "phoneNumber" to phoneNumber
                         )
                     }
                     "send money" -> {
                         mpesaDetails = mapOf(
-                            "phoneNumber" to (snapshot.child("sendMoneyPhone").value?.toString() ?: "")
+                            "phoneNumber" to phoneNumber,
+                            "sendMoneyPhone" to (snapshot.child("sendMoneyPhone").value?.toString() ?: "")
                         )
                     }
                 }
@@ -204,6 +209,20 @@ fun PaymentPage(
                 else -> "M-Pesa"
             })
 
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Phone number input
+            OutlinedTextField(
+                value = phoneNumber,
+                onValueChange = { phoneNumber = it },
+                label = { Text("Your M-Pesa Phone Number") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                placeholder = { Text("e.g., 0712345678") },
+                singleLine = true
+            )
+
             Spacer(modifier = Modifier.weight(1f))
 
             // Payment Status Message
@@ -239,12 +258,23 @@ fun PaymentPage(
                         return@Button
                     }
 
+                    // Update mpesaDetails with current phone number
+                    val updatedMpesaDetails = when (mpesaOption?.lowercase()) {
+                        "pochi la biashara" -> mpesaDetails + ("phoneNumber" to phoneNumber)
+                        "paybill" -> mpesaDetails + ("phoneNumber" to phoneNumber)
+                        "till number" -> mpesaDetails + ("phoneNumber" to phoneNumber)
+                        "send money" -> mpesaDetails + ("phoneNumber" to phoneNumber)
+                        else -> mpesaDetails
+                    }
+
+                    android.util.Log.d("Payment", "Making payment with details: $updatedMpesaDetails")
+
                     MpesaPaymentHandler.initiatePayment(
                         context = context,
                         registrationNumber = registrationNumber!!,
                         amount = validFare,
                         mpesaOption = mpesaOption!!,
-                        mpesaDetails = mpesaDetails
+                        mpesaDetails = updatedMpesaDetails
                     ) { success, message ->
                         isLoading = false
                         paymentStatus = message

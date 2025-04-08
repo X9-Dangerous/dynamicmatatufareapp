@@ -33,49 +33,70 @@ object MpesaPaymentHandler {
         android.util.Log.d("MpesaPayment", "Amount: $amount")
         when (mpesaOption.lowercase()) {
             "send money" -> {
-                val phoneNumber = mpesaDetails["phoneNumber"]
-                if (phoneNumber.isNullOrEmpty()) {
-                    callback(false, "Phone number not found for Send Money payment")
+                val targetPhone = mpesaDetails["sendMoneyPhone"]
+                val customerPhone = mpesaDetails["phoneNumber"]
+                if (targetPhone.isNullOrEmpty()) {
+                    callback(false, "Target phone number not found for Send Money payment")
                     return
                 }
-                android.util.Log.d("MpesaPayment", "Initiating Send Money payment to: $phoneNumber")
-                mpesaService.initiateMpesaPayment(phoneNumber, amount) { success, message ->
+                if (customerPhone.isNullOrEmpty()) {
+                    callback(false, "Please enter your M-Pesa phone number")
+                    return
+                }
+                android.util.Log.d("MpesaPayment", "Initiating Send Money payment to: $targetPhone from: $customerPhone")
+                mpesaService.initiateMpesaPayment(targetPhone, amount, customerPhone = customerPhone) { success, message ->
                     callback(success, message)
                 }
             }
             "till number" -> {
                 android.util.Log.d("MpesaPayment", "Processing Till Number payment with details: $mpesaDetails")
                 val tillNumber = mpesaDetails["tillNumber"]
+                val customerPhone = mpesaDetails["phoneNumber"]
                 if (tillNumber.isNullOrEmpty()) {
                     android.util.Log.e("MpesaPayment", "Till number is null or empty in details: $mpesaDetails")
                     callback(false, "Till number not found in payment details")
                     return
                 }
-                android.util.Log.d("MpesaPayment", "Initiating Till payment to: $tillNumber")
-                mpesaService.initiateMpesaPayment(tillNumber, amount) { success, message ->
+                if (customerPhone.isNullOrEmpty()) {
+                    android.util.Log.e("MpesaPayment", "Customer phone is required for Till Number payments")
+                    callback(false, "Please enter your M-Pesa phone number")
+                    return
+                }
+                android.util.Log.d("MpesaPayment", "Initiating Till payment to: $tillNumber from phone: $customerPhone")
+                mpesaService.initiateMpesaPayment(tillNumber, amount, customerPhone = customerPhone, isTillNumber = true) { success, message ->
                     callback(success, message)
                 }
             }
             "paybill" -> {
                 val paybillNumber = mpesaDetails["paybillNumber"]
                 val accountNumber = mpesaDetails["accountNumber"]
+                val customerPhone = mpesaDetails["phoneNumber"]
                 if (paybillNumber.isNullOrEmpty() || accountNumber.isNullOrEmpty()) {
                     callback(false, "Paybill or account number not found")
                     return
                 }
-                android.util.Log.d("MpesaPayment", "Initiating Paybill payment to: $paybillNumber, Account: $accountNumber")
-                mpesaService.initiateMpesaPayment(paybillNumber, amount, accountNumber) { success, message ->
+                if (customerPhone.isNullOrEmpty()) {
+                    callback(false, "Please enter your M-Pesa phone number")
+                    return
+                }
+                android.util.Log.d("MpesaPayment", "Initiating Paybill payment to: $paybillNumber, Account: $accountNumber, From: $customerPhone")
+                mpesaService.initiateMpesaPayment(paybillNumber, amount, customerPhone = customerPhone, accountRef = accountNumber) { success, message ->
                     callback(success, message)
                 }
             }
             "pochi la biashara" -> {
                 val pochiNumber = mpesaDetails["pochiNumber"]
+                val customerPhone = mpesaDetails["phoneNumber"]
                 if (pochiNumber.isNullOrEmpty()) {
                     callback(false, "Pochi la Biashara number not found")
                     return
                 }
-                android.util.Log.d("MpesaPayment", "Initiating Pochi payment to: $pochiNumber")
-                mpesaService.initiateMpesaPayment(pochiNumber, amount) { success, message ->
+                if (customerPhone.isNullOrEmpty()) {
+                    callback(false, "Please enter your M-Pesa phone number")
+                    return
+                }
+                android.util.Log.d("MpesaPayment", "Initiating Pochi payment to: $pochiNumber from: $customerPhone")
+                mpesaService.initiateMpesaPayment(pochiNumber, amount, customerPhone = customerPhone) { success, message ->
                     callback(success, message)
                 }
             }
