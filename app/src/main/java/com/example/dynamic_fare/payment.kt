@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.database.FirebaseDatabase
+import com.example.dynamic_fare.models.MatatuFares
 
 @Composable
 fun PaymentPage(
@@ -25,7 +26,8 @@ fun PaymentPage(
     weatherManager: WeatherManager,
     timeManager: TimeManager,
     getMatatuIdFromRegistration: (String, (String?) -> Unit) -> Unit,
-    onPaymentSuccess: () -> Unit = {}
+    onPaymentSuccess: () -> Unit = {},
+    userId: String
 ) {
     val context = LocalContext.current
     var registrationNumber by remember { mutableStateOf<String?>(null) }
@@ -35,6 +37,48 @@ fun PaymentPage(
     var mpesaOption by remember { mutableStateOf<String?>(null) }
     var mpesaDetails by remember { mutableStateOf<Map<String, String>>(mapOf()) }
     var phoneNumber by remember { mutableStateOf("") }
+    var isPhoneLoaded by remember { mutableStateOf(false) }
+    var isDisabled by remember { mutableStateOf(false) }
+    var originalFare by remember { mutableStateOf<String?>(null) }
+    
+    // Use the provided userId parameter
+    android.util.Log.d("Payment", "Using userId: $userId")
+    
+    // Fetch user's phone number and accessibility settings
+    LaunchedEffect(userId) {
+        // Check accessibility settings
+        val settingsRef = FirebaseDatabase.getInstance().getReference("userSettings").child(userId)
+        settingsRef.get().addOnSuccessListener { settingsSnapshot ->
+            if (settingsSnapshot.exists()) {
+                isDisabled = settingsSnapshot.child("isDisabled").getValue(Boolean::class.java) ?: false
+                android.util.Log.d("Payment", "User disability status: $isDisabled")
+            }
+        }
+        android.util.Log.d("Payment", "Starting phone fetch for userId: $userId")
+        val userRef = FirebaseDatabase.getInstance().getReference("users").child(userId)
+        userRef.get().addOnSuccessListener { snapshot ->
+            android.util.Log.d("Payment", "Got snapshot for userId: $userId, exists: ${snapshot.exists()}")
+            if (snapshot.exists()) {
+                android.util.Log.d("Payment", "Snapshot value: ${snapshot.value}")
+                val userPhone = snapshot.child("phone").value?.toString() ?: ""
+                android.util.Log.d("Payment", "Raw phone number from Firebase: $userPhone")
+                if (userPhone.isNotEmpty()) {
+                    // Format phone number for M-Pesa
+                    val formattedPhone = formatPhoneNumber(userPhone)
+                    phoneNumber = formattedPhone
+                    isPhoneLoaded = true
+                    android.util.Log.d("Payment", "Successfully set phone number: $formattedPhone")
+                } else {
+                    android.util.Log.e("Payment", "Phone number was empty in Firebase")
+                    isPhoneLoaded = false
+                }
+            } else {
+                android.util.Log.e("Payment", "User document does not exist in Firebase")
+            }
+        }.addOnFailureListener { e ->
+            android.util.Log.e("Payment", "Error fetching user phone: ${e.message}")
+        }
+    }
 
     // Fetch all required data in parallel
     LaunchedEffect(scannedQRCode) {
@@ -95,7 +139,7 @@ fun PaymentPage(
                 val city = snapshot.child("routeStart").value?.toString()?.split(",")?.lastOrNull()?.trim() ?: "Nairobi"
                 android.util.Log.d("Payment", "Fetching weather for city: $city")
                 
-                weatherManager.fetchWeather(city) { raining ->
+                weatherManager.fetchWeather { raining ->
                     if (!weatherFetched) {  // Only update if we haven't timed out
                         isRaining = raining
                         weatherFetched = true
@@ -114,12 +158,47 @@ fun PaymentPage(
                             override fun run() {
                                 if (weatherFetched || attempts >= maxAttempts) {
                                     val isPeakHours = timeManager.isPeakHours()
-                                    val (finalFare, breakdown) = fareManager.getFare(fares, isPeakHours, isRaining, false, false)
-                                    // Round to nearest whole number to avoid decimal issues
-                                    fare = finalFare.toInt().toString()
-                                    paymentStatus = breakdown
-                                    isLoading = false
-                                    android.util.Log.d("Payment", "Final fare amount: $fare")
+                                    // Get the matatu ID first
+                                    val matatuId = snapshot.key
+                                    android.util.Log.d("Payment", "Matatu ID: $matatuId")
+                                    
+                                    // Get fares from the correct path
+                                    val faresRef = FirebaseDatabase.getInstance().getReference("fares/$matatuId")
+                                    faresRef.get().addOnSuccessListener { faresSnapshot ->
+                                        android.util.Log.d("Payment", "Fares data: ${faresSnapshot.value}")
+                                        
+                                        // Convert snapshot to MatatuFares object
+                                        val fareData = faresSnapshot.value as? Map<*, *>
+                                        val matatuFares = MatatuFares(
+                                            matatuId = matatuId ?: "",
+                                            peakFare = (fareData?.get("peakFare") as? Number)?.toDouble() ?: 0.0,
+                                            nonPeakFare = (fareData?.get("nonPeakFare") as? Number)?.toDouble() ?: 0.0,
+                                            rainyPeakFare = (fareData?.get("rainyPeakFare") as? Number)?.toDouble() ?: 0.0,
+                                            rainyNonPeakFare = (fareData?.get("rainyNonPeakFare") as? Number)?.toDouble() ?: 0.0,
+                                            disabilityDiscount = (fareData?.get("disabilityDiscount") as? Number)?.toDouble() ?: 0.0
+                                        )
+                                        
+                                        android.util.Log.d("Payment", "Disability discount from fares: ${matatuFares.disabilityDiscount}%")
+                                        
+                                        // Then calculate the fare using the fetched fares data
+                                        val (baseFare, breakdown) = fareManager.getFare(matatuFares, isPeakHours, isRaining, isDisabled, false)
+                                        
+                                        // Store original and final fares
+                                        originalFare = baseFare.toInt().toString()
+                                        fare = baseFare.toInt().toString()
+                                        android.util.Log.d("Payment", "Original fare: $originalFare, Final fare: $fare")
+                                        
+                                        // Use the breakdown directly since getFare() now includes the disability discount info
+                                        val finalBreakdown = breakdown
+                                        
+                                        paymentStatus = finalBreakdown
+                                        android.util.Log.d("Payment", "Original fare: $originalFare, Final fare (after disability check): $fare")
+                                        isLoading = false
+                                    }.addOnFailureListener { e ->
+                                        android.util.Log.e("Payment", "Error fetching fares: ${e.message}")
+                                        paymentStatus = "Error: Could not fetch fare information"
+                                        isLoading = false
+                                    }
                                 } else {
                                     attempts++
                                     android.os.Handler(android.os.Looper.getMainLooper())
@@ -201,6 +280,13 @@ fun PaymentPage(
             Spacer(modifier = Modifier.height(20.dp))
             PaymentDetailRow("Fare", "KES $fare")
             Spacer(modifier = Modifier.height(20.dp))
+            // Show original and discounted fare if user is disabled and there's a discount
+            if (isDisabled && originalFare != null && fare != originalFare) {
+                PaymentDetailRow("Original Fare", "KES $originalFare")
+                PaymentDetailRow("Disability Discount Applied", "")
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+            }
+
             PaymentDetailRow("Payment method", when(mpesaOption?.lowercase()) {
                 "pochi la biashara" -> "M-Pesa Pochi la Biashara"
                 "paybill" -> "M-Pesa Paybill"
@@ -211,16 +297,10 @@ fun PaymentPage(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Phone number input
-            OutlinedTextField(
-                value = phoneNumber,
-                onValueChange = { phoneNumber = it },
-                label = { Text("Your M-Pesa Phone Number") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                placeholder = { Text("e.g., 0712345678") },
-                singleLine = true
+            // Display phone number
+            PaymentDetailRow(
+                label = "Your M-Pesa Number",
+                value = phoneNumber
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -238,6 +318,11 @@ fun PaymentPage(
             // Pay Button
             Button(
                 onClick = {
+                    if (!isPhoneLoaded || phoneNumber.isEmpty()) {
+                        paymentStatus = "Please wait, loading your M-Pesa number..."
+                        return@Button
+                    }
+
                     isLoading = true
                     paymentStatus = "Processing payment..."
 
@@ -259,13 +344,8 @@ fun PaymentPage(
                     }
 
                     // Update mpesaDetails with current phone number
-                    val updatedMpesaDetails = when (mpesaOption?.lowercase()) {
-                        "pochi la biashara" -> mpesaDetails + ("phoneNumber" to phoneNumber)
-                        "paybill" -> mpesaDetails + ("phoneNumber" to phoneNumber)
-                        "till number" -> mpesaDetails + ("phoneNumber" to phoneNumber)
-                        "send money" -> mpesaDetails + ("phoneNumber" to phoneNumber)
-                        else -> mpesaDetails
-                    }
+                    android.util.Log.d("Payment", "Current phone number before payment: $phoneNumber")
+                    val updatedMpesaDetails = mpesaDetails + ("phoneNumber" to phoneNumber)
 
                     android.util.Log.d("Payment", "Making payment with details: $updatedMpesaDetails")
 
@@ -290,12 +370,36 @@ fun PaymentPage(
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
                     .height(50.dp),
-                enabled = fare != null && !isLoading
+                enabled = fare != null && !isLoading && isPhoneLoaded && phoneNumber.isNotEmpty()
             ) {
                 Text(text = "PAY", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
+}
+
+// Helper function to format phone number for M-Pesa
+private fun formatPhoneNumber(phone: String): String {
+    // Remove any non-digit characters
+    val digitsOnly = phone.replace(Regex("[^0-9]"), "")
+    
+    // If it starts with 254, use as is
+    if (digitsOnly.startsWith("254")) {
+        return digitsOnly
+    }
+    
+    // If it starts with 0, replace with 254
+    if (digitsOnly.startsWith("0")) {
+        return "254${digitsOnly.substring(1)}"
+    }
+    
+    // If it's just 9 digits (without country code), add 254
+    if (digitsOnly.length == 9) {
+        return "254$digitsOnly"
+    }
+    
+    // Return original digits if none of the above match
+    return digitsOnly
 }
 
 @Composable

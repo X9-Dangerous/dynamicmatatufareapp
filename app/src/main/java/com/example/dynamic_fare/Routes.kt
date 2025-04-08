@@ -34,7 +34,7 @@ object Routes {
     const val FleetAndFareTabs = "fleetAndFare/{fleetId}"
     const val SetFaresScreen = "setFares/{matatuId}"
     const val FareDisplayScreen = "fareDisplay/{matatuId}"
-    const val PaymentPage = "paymentPage/{scannedQRCode}"
+    const val PaymentPage = "paymentPage/{scannedQRCode}/{userId}"
     const val NotificationsScreen = "notifications/{userId}"
     const val SettingsScreen = "settings/{userId}"
     const val AccessibilitySettingsScreen = "accessibility/{userId}"
@@ -48,7 +48,7 @@ object Routes {
     fun detailMatatuRoute(matatuId: String): String = "detailMatatu/$matatuId"
     fun fareTabbedRoute(matatuId: String): String = "fare_tabbed_screen/$matatuId"
     fun profileRoute(userId: String): String = "profile/$userId"
-    fun paymentPageWithQRCode(scannedQRCode: String): String = "paymentPage/$scannedQRCode"
+    fun paymentPageWithQRCode(scannedQRCode: String, userId: String): String = "paymentPage/$scannedQRCode/$userId"
     fun notificationsRoute(userId: String): String = "notifications/$userId"
     fun clientProfileRoute(userId: String): String = "clientProfile/$userId"
     fun settingsRoute(userId: String): String = "settings/$userId"
@@ -130,9 +130,13 @@ fun AppNavigation(
         }
         composable(
             Routes.PaymentPage,
-            arguments = listOf(navArgument("scannedQRCode") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("scannedQRCode") { type = NavType.StringType },
+                navArgument("userId") { type = NavType.StringType }
+            )
         ) { backStackEntry ->
             val scannedQRCode = backStackEntry.arguments?.getString("scannedQRCode") ?: ""
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
             PaymentPage(
                 navController = navController,
                 scannedQRCode = scannedQRCode,
@@ -142,7 +146,8 @@ fun AppNavigation(
                 getMatatuIdFromRegistration = { regNo, callback ->
                     fareManager.getMatatuIdFromRegistration(regNo, callback)
                 },
-                onPaymentSuccess = { /* handle payment success */ }
+                onPaymentSuccess = { /* handle payment success */ },
+                userId = userId
             )
         }
         composable(

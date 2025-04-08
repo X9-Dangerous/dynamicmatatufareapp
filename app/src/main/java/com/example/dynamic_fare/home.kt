@@ -141,12 +141,12 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
         // Get fare estimate
         scope.launch {
             try {
-                val weatherManager = WeatherManager("d77ed3bf47a3594d4053bb96e601958f")
+                val weatherManager = WeatherManager()
                 // Check peak hours
                 val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
                 val isPeakTime = hour in 6..9 || hour in 16..20
                 var isRaining = false
-                weatherManager.fetchWeather("Nairobi") { isRainy ->
+                weatherManager.fetchWeather { isRainy ->
                     isRaining = isRainy
                 }
                 estimatedFare = fareEstimator.estimateFare(

@@ -20,7 +20,7 @@ class FareProcessor(
         val matatuId = qrCodeData.trim()  // QR code data should be Matatu ID here
 
         // Fetch weather information
-        weatherManager.fetchWeather(city) { isRaining ->
+        weatherManager.fetchWeather { isRaining ->
 
             // Fetch fare details based on matatuId
             fareManager.fetchFares(matatuId) { fares ->

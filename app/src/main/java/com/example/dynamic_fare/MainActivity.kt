@@ -40,8 +40,7 @@ class MainActivity : ComponentActivity() {
         val database = AppDatabase.getDatabase(this)
         val fareManager = FareManager(FirebaseDatabase.getInstance())
         val timeManager = TimeManager()
-        val apiKey = "d77ed3bf47a3594d4053bb96e601958f"
-        val weatherManager = WeatherManager(apiKey)
+        val weatherManager = WeatherManager()
         val getMatatuIdFromRegistration = fareManager::getMatatuIdFromRegistration
 
 
@@ -196,9 +195,14 @@ class MainActivity : ComponentActivity() {
 
                     composable(
                         Routes.PaymentPage,
-                        arguments = listOf(navArgument("scannedQRCode") { type = NavType.StringType })
+                        arguments = listOf(
+                            navArgument("scannedQRCode") { type = NavType.StringType },
+                            navArgument("userId") { type = NavType.StringType }
+                        )
                     ) { backStackEntry ->
                         val scannedQRCode = backStackEntry.arguments?.getString("scannedQRCode") ?: ""
+                        val userId = backStackEntry.arguments?.getString("userId") ?: operatorId
+                        Log.d("MainActivity", "Payment page userId: $userId")
                         PaymentPage(
                             navController = navController,
                             scannedQRCode = scannedQRCode,
@@ -207,7 +211,8 @@ class MainActivity : ComponentActivity() {
                             weatherManager = weatherManager,
                             getMatatuIdFromRegistration = { regNo, callback ->
                                 fareManager.getMatatuIdFromRegistration(regNo, callback)
-                            }
+                            },
+                            userId = userId
                         )
                     }
 

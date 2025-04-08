@@ -113,7 +113,8 @@ fun SetFaresScreen(matatuId: String) {
         OutlinedTextField(
             value = disabilityDiscount,
             onValueChange = { disabilityDiscount = it },
-            label = { Text("Set Disability Discount (Optional)") },
+            label = { Text("Set Disability Discount % (Optional)") },
+            placeholder = { Text("Enter percentage e.g. 20 for 20%") },
             keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )

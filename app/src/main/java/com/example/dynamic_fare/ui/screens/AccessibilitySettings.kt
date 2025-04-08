@@ -24,35 +24,60 @@ fun AccessibilitySettingsScreen(navController: NavController, userId: String) {
     var userSettings by remember { mutableStateOf(UserAccessibilitySettings(userId = userId)) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    
+    // Keep track of the latest Firebase value
+    var firebaseDisabledState by remember { mutableStateOf(false) }
 
     // Load user settings
+    // Set up real-time listener for changes
     LaunchedEffect(userId) {
         val database = FirebaseDatabase.getInstance().getReference("userSettings")
-        database.child(userId).get().addOnSuccessListener { snapshot ->
+        val userRef = database.child(userId)
+
+        // Initial load
+        userRef.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
+                val isDisabled = snapshot.child("isDisabled").getValue(Boolean::class.java) ?: false
+                val notificationsEnabled = snapshot.child("notificationsEnabled").getValue(Boolean::class.java) ?: true
+                firebaseDisabledState = isDisabled
                 userSettings = UserAccessibilitySettings(
                     userId = userId,
-                    isDisabled = snapshot.child("isDisabled").getValue(Boolean::class.java) ?: false,
-                    notificationsEnabled = snapshot.child("notificationsEnabled").getValue(Boolean::class.java) ?: true,
+                    isDisabled = isDisabled,
+                    notificationsEnabled = notificationsEnabled,
                     lastUpdated = snapshot.child("lastUpdated").getValue(Long::class.java) ?: System.currentTimeMillis()
                 )
             } else {
                 // Initialize settings if they don't exist
                 val initialSettings = UserAccessibilitySettings(userId = userId)
-                database.child(userId).setValue(initialSettings)
+                userRef.setValue(initialSettings)
                     .addOnSuccessListener {
                         userSettings = initialSettings
+                        firebaseDisabledState = false
                     }
                     .addOnFailureListener { e ->
                         error = "Failed to initialize settings: ${e.message}"
                     }
             }
             isLoading = false
-        }
-        .addOnFailureListener { e ->
+        }.addOnFailureListener { e ->
             error = "Error loading settings: ${e.message}"
             isLoading = false
         }
+
+        // Set up real-time listener
+        userRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (snapshot.exists()) {
+                    val isDisabled = snapshot.child("isDisabled").getValue(Boolean::class.java) ?: false
+                    firebaseDisabledState = isDisabled
+                    userSettings = userSettings.copy(isDisabled = isDisabled)
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                android.util.Log.e("AccessibilitySettings", "Database error: ${error.message}")
+            }
+        })
     }
 
     Scaffold(
@@ -90,14 +115,22 @@ fun AccessibilitySettingsScreen(navController: NavController, userId: String) {
                 ) {
                     Text("Disability Status")
                     Switch(
-                        checked = userSettings.isDisabled,
+                        checked = firebaseDisabledState,
                         onCheckedChange = { isDisabled ->
-                            userSettings = userSettings.copy(isDisabled = isDisabled)
+                            // Update local state immediately for UI responsiveness
+                            firebaseDisabledState = isDisabled
+                            
                             // Update in Database
                             FirebaseDatabase.getInstance()
                                 .getReference("userSettings")
                                 .child(userId)
-                                .setValue(userSettings)
+                                .child("isDisabled")
+                                .setValue(isDisabled)
+                                .addOnFailureListener { e ->
+                                    // Revert local state if update fails
+                                    firebaseDisabledState = !isDisabled
+                                    error = "Failed to update: ${e.message}"
+                                }
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,

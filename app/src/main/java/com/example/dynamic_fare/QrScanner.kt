@@ -109,43 +109,44 @@ fun QRScannerScreen(
                             // Get matatu ID from Firebase using registration number
                             val database = com.google.firebase.database.FirebaseDatabase.getInstance()
                             val matatusRef = database.getReference("matatus")
-                            
+
                             android.util.Log.d("QRScanner", "Looking up matatu with registration number: $barcodeValue")
-                            
+
                             // Query all matatus to find matching registration
                             matatusRef.get().addOnSuccessListener { snapshot ->
-                                        if (snapshot.exists()) {
-                                            android.util.Log.d("QRScanner", "Found matatus in database, searching for registration: $barcodeValue")
-                                            var foundMatatu = false
-                                            snapshot.children.forEach { matatuSnapshot ->
-                                                val registration = matatuSnapshot.child("registrationNumber").value?.toString()
-                                                android.util.Log.d("QRScanner", "Checking matatu ${matatuSnapshot.key} with registration: $registration")
-                                                if (registration == barcodeValue) {
-                                                    foundMatatu = true
-                                                    val matatuId = matatuSnapshot.key
-                                                    android.util.Log.d("QRScanner", "Found matching matatu! ID: $matatuId")
-                                                    navController.navigate(Routes.paymentPageWithQRCode(matatuId!!)) {
-                                                        popUpTo(Routes.QRScannerScreen) { inclusive = true }
-                                                    }
-                                                    return@forEach
-                                                }
+                                if (snapshot.exists()) {
+                                    android.util.Log.d("QRScanner", "Found matatus in database, searching for registration: $barcodeValue")
+                                    var foundMatatu = false
+                                    snapshot.children.forEach { matatuSnapshot ->
+                                        val registration = matatuSnapshot.child("registrationNumber").value?.toString()
+                                        android.util.Log.d("QRScanner", "Checking matatu ${matatuSnapshot.key} with registration: $registration")
+                                        if (registration == barcodeValue) {
+                                            foundMatatu = true
+                                            val matatuId = matatuSnapshot.key
+                                            android.util.Log.d("QRScanner", "Found matching matatu! ID: $matatuId")
+                                            android.util.Log.d("QRScanner", "Navigating to payment with userId: $userId")
+                                            navController.navigate(Routes.paymentPageWithQRCode(matatuId!!, userId)) {
+                                                popUpTo(Routes.QRScannerScreen) { inclusive = true }
                                             }
-                                            if (!foundMatatu) {
-                                                android.util.Log.d("QRScanner", "No matatu found with registration: $barcodeValue")
-                                                android.widget.Toast.makeText(
-                                                    context,
-                                                    "No matatu found with registration number: $barcodeValue",
-                                                    android.widget.Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                        } else {
-                                            android.util.Log.d("QRScanner", "No matatus exist in database")
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                "No matatus found in database",
-                                                android.widget.Toast.LENGTH_SHORT
-                                            ).show()
+                                            return@forEach
                                         }
+                                    }
+                                    if (!foundMatatu) {
+                                        android.util.Log.d("QRScanner", "No matatu found with registration: $barcodeValue")
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "No matatu found with registration number: $barcodeValue",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                } else {
+                                    android.util.Log.d("QRScanner", "No matatus exist in database")
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "No matatus found in database",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             }.addOnFailureListener { e ->
                                 android.util.Log.e("QRScanner", "Error querying database: ${e.message}")
                                 android.widget.Toast.makeText(
@@ -181,18 +182,13 @@ private fun CameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
-    
+
     var preview by remember { mutableStateOf<Preview?>(null) }
     val executor = remember { Executors.newSingleThreadExecutor() }
-    // Throttle scanning to prevent excessive CPU usage
-    var lastProcessingTimeMs by remember { mutableStateOf(0L) }
-    val minProcessingIntervalMs = 200L // Don't process more than 5 frames per second
-    
     val scanner = remember {
         BarcodeScanning.getClient(
             BarcodeScannerOptions.Builder()
                 .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .enableAllPotentialBarcodes()  // Optimize for all possible QR versions
                 .build()
         )
     }
@@ -219,23 +215,13 @@ private fun CameraPreview(
                     preview.setSurfaceProvider(previewView.surfaceProvider)
 
                     val imageAnalysis = ImageAnalysis.Builder()
-                        .setTargetResolution(AndroidSize(640, 480))  // Lower resolution is faster
+                        .setTargetResolution(AndroidSize(1280, 720))
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .setTargetRotation(previewView.display.rotation)
-                        .setOutputImageRotationEnabled(true)  // Hardware acceleration
-                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                         .build()
 
                     imageAnalysis.setAnalyzer(executor) { imageProxy ->
-                        val currentTime = System.currentTimeMillis()
-                        if (currentTime - lastProcessingTimeMs < minProcessingIntervalMs) {
-                            imageProxy.close()
-                            return@setAnalyzer
-                        }
-                        
                         val mediaImage = imageProxy.image
                         if (mediaImage != null) {
-                            lastProcessingTimeMs = currentTime
                             val image = InputImage.fromMediaImage(
                                 mediaImage,
                                 imageProxy.imageInfo.rotationDegrees

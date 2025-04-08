@@ -1,6 +1,7 @@
 package com.example.dynamic_fare
 
 import android.util.Log
+import com.example.dynamic_fare.data.WeatherRepository
 import com.google.firebase.database.*
 import okhttp3.*
 import org.json.JSONObject
@@ -45,9 +46,12 @@ class FareManager(private val database: FirebaseDatabase) {
         val breakdown = StringBuilder("Base Fare: Ksh $baseFare\n")
 
         if (isDisabled) {
-            val disabilityDiscount = fares?.disabilityDiscount ?: 0.0
-            finalFare -= disabilityDiscount
-            breakdown.append("Disability Discount Applied: -Ksh $disabilityDiscount\n")
+            val discountPercentage = fares?.disabilityDiscount ?: 0.0
+            if (discountPercentage > 0) {
+                val discountAmount = (finalFare * (discountPercentage / 100.0))
+                finalFare -= discountAmount
+                breakdown.append("Disability Discount Applied: -${discountPercentage}% (-Ksh $discountAmount)\n")
+            }
         }
 
         val surgeFactor = if (trafficDelay) 1.2 else 1.0
@@ -83,59 +87,30 @@ class FareManager(private val database: FirebaseDatabase) {
     }
 }
 
-class WeatherManager(private val apiKey: String) {
-    private val client = OkHttpClient()
+class WeatherManager {
+    private val weatherRepository: WeatherRepository = WeatherRepository()
     private var cachedWeather: Boolean? = null
     private var lastFetchTime: Long = 0
 
-    fun fetchWeather(city: String, callback: (Boolean) -> Unit) {
+    fun fetchWeather(callback: (Boolean) -> Unit) {
+        val city = "Nairobi" // Always use Nairobi
         val currentTime = System.currentTimeMillis()
 
-        // Use cached result if it's recent (10 minutes)
-        if (cachedWeather != null && currentTime - lastFetchTime < 600000) {
+        // Return cached result if available and less than 30 minutes old
+        if (cachedWeather != null && currentTime - lastFetchTime < 30 * 60 * 1000) {
+            android.util.Log.d("WeatherManager", "Using cached weather data: isRaining=$cachedWeather")
             callback(cachedWeather!!)
             return
         }
 
-        val url = "https://api.openweathermap.org/data/2.5/weather?q=$city&appid=$apiKey"
-        val request = Request.Builder().url(url).build()
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e("WeatherAPI", "Failed to fetch weather: ${e.message}")
-                callback(false) // Return false on failure
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                response.use {  // Ensure response is closed after processing
-                    if (!response.isSuccessful) {
-                        Log.e("WeatherAPI", "Unsuccessful response: ${response.code}")
-                        callback(false)
-                        return
-                    }
-
-                    try {
-                        response.body?.string()?.let { responseBody ->
-                            val json = JSONObject(responseBody)
-
-                            if (!json.has("weather")) {
-                                Log.e("WeatherAPI", "Missing 'weather' field in response")
-                                callback(false)
-                                return
-                            }
-
-                            val weather = json.getJSONArray("weather").getJSONObject(0).getString("main")
-                            cachedWeather = weather == "Rain"
-                            lastFetchTime = System.currentTimeMillis()
-                            callback(cachedWeather!!)
-                        } ?: callback(false)
-                    } catch (e: Exception) {
-                        Log.e("WeatherAPI", "Error parsing weather response: ${e.message}")
-                        callback(false)
-                    }
-                }
-            }
-        })
+        weatherRepository.getWeather(city) { isRaining ->
+            // Update cache with new weather data
+            cachedWeather = isRaining
+            lastFetchTime = currentTime
+            
+            android.util.Log.d("WeatherManager", "Updated weather data: isRaining=$isRaining")
+            callback(isRaining)
+        }
     }
 }
 
@@ -157,7 +132,7 @@ fun processQrScan(
 ) {
     val database = FirebaseDatabase.getInstance()
     val fareManager = FareManager(database)
-    val weatherManager = WeatherManager("d77ed3bf47a3594d4053bb96e601958f") // Pass API key safely
+    val weatherManager = WeatherManager()
     val timeManager = TimeManager()
 
     val matatuRegNo = qrCodeData.trim()
@@ -166,7 +141,7 @@ fun processQrScan(
     fareManager.getMatatuIdFromRegistration(registrationNumber = matatuRegNo) { matatuId ->
         if (matatuId != null) {
             // Step 2: Fetch fares using matatuID
-            weatherManager.fetchWeather(city) { isRaining ->
+            weatherManager.fetchWeather { isRaining ->
                 fareManager.fetchFares(matatuId) { fares ->
                     if (fares != null) {
                         val isPeakHours = timeManager.isPeakHours()
