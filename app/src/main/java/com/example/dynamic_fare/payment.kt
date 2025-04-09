@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.database.FirebaseDatabase
 import com.example.dynamic_fare.models.MatatuFares
+import com.example.dynamic_fare.models.Payment
 
 @Composable
 fun PaymentPage(
@@ -360,7 +361,37 @@ fun PaymentPage(
                         paymentStatus = message
 
                         if (success) {
-                            onPaymentSuccess()
+                            // Save payment to history
+                            val database = FirebaseDatabase.getInstance().getReference("payments")
+                            val paymentId = database.push().key ?: return@initiatePayment
+                            
+                            val payment = Payment(
+                                id = paymentId,
+                                userId = userId,
+                                amount = validFare.toDouble(),
+                                route = scannedQRCode,
+                                timestamp = System.currentTimeMillis(),
+                                status = "completed",
+                                startLocation = "Current Location",  // You can update this with actual locations
+                                endLocation = "Destination",
+                                matatuRegistration = registrationNumber.toString(),
+                                mpesaReceiptNumber = message.substringAfter("Receipt number: ").takeIf { message.contains("Receipt number:") } ?: "",
+                                paymentMethod = mpesaOption.toString(),
+                                phoneNumber = phoneNumber
+                            )
+
+                            database.child(paymentId).setValue(payment)
+                                .addOnSuccessListener {
+                                    // Show success message and navigate back
+                                    android.util.Log.d("Payment", "Payment saved to history")
+                                    onPaymentSuccess()
+                                    navController.navigate(Routes.matatuEstimateRoute()) {
+                                        popUpTo(Routes.matatuEstimateRoute()) { inclusive = true }
+                                    }
+                                }
+                                .addOnFailureListener { e ->
+                                    android.util.Log.e("Payment", "Failed to save payment: ${e.message}")
+                                }
                         }
                     }
                 },

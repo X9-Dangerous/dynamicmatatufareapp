@@ -45,10 +45,24 @@ class WeatherRepository {
                         response.body?.let { responseBody ->
                             try {
                                 val json = JSONObject(responseBody.string())
-                                val weather = json.getJSONArray("weather").getJSONObject(0).getString("main")
-                                val isRaining = weather.contains("Rain", ignoreCase = true)
-                                Log.d("WeatherAPI", "Weather condition: $weather, isRaining: $isRaining")
-                                callback(isRaining)
+                                val weatherObj = json.getJSONArray("weather").getJSONObject(0)
+                                val mainWeather = weatherObj.getString("main")
+                                val description = weatherObj.getString("description")
+                                
+                                // Check for rain in both main condition and description
+                                val rainKeywords = listOf("rain", "drizzle", "shower")
+                                val isRaining = rainKeywords.any { keyword ->
+                                    mainWeather.contains(keyword, ignoreCase = true) ||
+                                    description.contains(keyword, ignoreCase = true)
+                                }
+                                
+                                // Also check precipitation values if available
+                                val rain = json.optJSONObject("rain")
+                                val hasRainfall = rain?.optDouble("1h", 0.0) ?: 0.0 > 0.0
+                                
+                                val finalIsRaining = isRaining || hasRainfall
+                                Log.d("WeatherAPI", "Weather: $mainWeather, Description: $description, Rainfall: ${if (hasRainfall) "Yes" else "No"}, isRaining: $finalIsRaining")
+                                callback(finalIsRaining)
                             } catch (e: Exception) {
                                 Log.e("WeatherAPI", "Error parsing response: ${e.message}")
                                 callback(false)
