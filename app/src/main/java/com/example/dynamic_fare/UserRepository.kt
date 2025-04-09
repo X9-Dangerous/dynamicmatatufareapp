@@ -49,7 +49,7 @@ class UserRepository {
         return try {
             Log.d("UserRepository", "Attempting to fetch user data for userId: $userId")
             val snapshot = database.child(userId).get().await()
-            
+
             if (snapshot.exists()) {
                 val userData = UserData(
                     name = snapshot.child("name").getValue(String::class.java) ?: "",
@@ -74,7 +74,7 @@ class UserRepository {
         return try {
             Log.d("UserRepository", "Attempting to fetch operator data for userId: $userId")
             val snapshot = database.child(userId).get().await()
-            
+
             if (snapshot.exists() && snapshot.child("role").getValue(String::class.java) == "Matatu Operator") {
                 val operatorData = OperatorData(
                     businessName = snapshot.child("businessName").getValue(String::class.java) ?: "",

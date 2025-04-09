@@ -90,91 +90,211 @@ fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
         item {
             Text(
                 text = "Matatu Details",
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color.Black,
-                modifier = Modifier.padding(bottom = 16.dp)
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 24.dp)
             )
         }
 
         matatuDetails?.let { details ->
-            // Registration Section
+            // Vehicle Information Card
             item {
-                Column(modifier = Modifier.padding(bottom = 16.dp)) {
-                    Text(
-                        text = "Registration Number",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color.Black
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
-                    Text(
-                        text = details.registrationNumber,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.Black
-                    )
-                }
-            }
-
-            // Route Section
-            item {
-                Column(modifier = Modifier.padding(bottom = 16.dp)) {
-                    Text(
-                        text = "Route",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color.Black
-                    )
-                    Text(
-                        text = "${details.routeStart} → ${details.routeEnd}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.Black
-                    )
-                }
-            }
-
-            // Stops Section
-            item {
-                Column(modifier = Modifier.padding(bottom = 16.dp)) {
-                    Text(
-                        text = "Stops",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color.Black
-                    )
-                    Text(
-                        text = details.stops.joinToString(" → "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black
-                    )
-                }
-            }
-
-            // M-Pesa Payment Section
-            item {
-                Column(modifier = Modifier.padding(bottom = 16.dp)) {
-                    Text("M-Pesa Payment Method", style = MaterialTheme.typography.titleSmall, color = Color.Black)
-
-                    // Display the chosen method
-                    Text("Selected Option: ${details.mpesaOption}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-
-                    // Display the corresponding value
-                    when (details.mpesaOption.lowercase()) {
-                        "pochi la biashara" -> Text("Phone Number: ${details.pochiNumber}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-                        "send money" -> Text("Phone Number: ${details.sendMoneyPhone}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-                        "till number" -> Text("Till Number: ${details.tillNumber}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-                        "paybill" -> {
-                            Text("Paybill Number: ${details.paybillNumber}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-                            Text("Account Number: ${details.accountNumber}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
-                        }
-                        else -> Text("Unknown Option", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Vehicle Information",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        DetailRow(
+                            label = "Registration Number",
+                            value = details.registrationNumber,
+                            isHighlighted = true
+                        )
                     }
                 }
             }
 
+            // Route Information Card
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Route Information",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        DetailRow(
+                            label = "Route",
+                            value = "${details.routeStart} → ${details.routeEnd}",
+                            isHighlighted = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Stops",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = details.stops.joinToString(" → "),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
+            // Payment Information Card
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Payment Information",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        DetailRow(
+                            label = "M-Pesa Option",
+                            value = details.mpesaOption,
+                            isHighlighted = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        when (details.mpesaOption.lowercase()) {
+                            "pochi la biashara" -> DetailRow(
+                                label = "Pochi Number",
+                                value = details.pochiNumber
+                            )
+                            "send money" -> DetailRow(
+                                label = "Phone Number",
+                                value = details.sendMoneyPhone
+                            )
+                            "till number" -> DetailRow(
+                                label = "Till Number",
+                                value = details.tillNumber
+                            )
+                            "paybill" -> {
+                                DetailRow(
+                                    label = "Paybill Number",
+                                    value = details.paybillNumber
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                DetailRow(
+                                    label = "Account Number",
+                                    value = details.accountNumber
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         } ?: item {
-            Text(
-                text = "Loading matatu details...",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.Black,
-                modifier = Modifier.padding(top = 12.dp)
-            )
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (error != null) {
+                        Text(
+                            text = error!!,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    } else {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Loading matatu details...",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun DetailRow(
+    label: String,
+    value: String,
+    isHighlighted: Boolean = false
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = if (isHighlighted) {
+                MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else {
+                MaterialTheme.typography.bodyLarge
+            },
+            color = if (isHighlighted) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            }
+        )
     }
 }
 
