@@ -130,9 +130,38 @@ fun SetFaresScreen(matatuId: String) {
                     message = "Error: Invalid Matatu ID"
                     return@Button
                 }
+
+                // Validate that all fare inputs are numbers and greater than zero
+                val peakFare = peakHours.toDoubleOrNull()
+                val nonPeakFare = nonPeakHours.toDoubleOrNull()
+                val rainyPeakFare = rainingPeakFare.toDoubleOrNull()
+                val rainyNonPeakFare = rainingNonPeakFare.toDoubleOrNull()
+                val discount = disabilityDiscount.toDoubleOrNull()
+
+                if (peakFare == null || peakFare <= 0) {
+                    message = "Error: Peak Hours Fare must be a number greater than zero"
+                    return@Button
+                }
+                if (nonPeakFare == null || nonPeakFare <= 0) {
+                    message = "Error: Non-Peak Hours Fare must be a number greater than zero"
+                    return@Button
+                }
+                if (rainyPeakFare == null || rainyPeakFare <= 0) {
+                    message = "Error: Rainy Peak Hours Fare must be a number greater than zero"
+                    return@Button
+                }
+                if (rainyNonPeakFare == null || rainyNonPeakFare <= 0) {
+                    message = "Error: Rainy Non-Peak Hours Fare must be a number greater than zero"
+                    return@Button
+                }
+                if (discount != null && (discount < 0 || discount > 100)) {
+                    message = "Error: Disability Discount must be between 0 and 100"
+                    return@Button
+                }
+
                 Log.d("SetFaresScreen", "Saving fares for matatuId: $matatuId")
                 Log.d("SetFaresScreen", "Fare values: peak=$peakHours, nonPeak=$nonPeakHours, rainyPeak=$rainingPeakFare, rainyNonPeak=$rainingNonPeakFare, discount=$disabilityDiscount")
-                
+
                 FareRepository.saveFares(
                     matatuId = matatuId,
                     peak = peakHours,
