@@ -113,13 +113,8 @@ class FareEstimator {
     }
 
     private fun estimateBasedOnDistance(distance: Double, isPeakHour: Boolean, isRainyWeather: Boolean): Double {
-        // Base rate calculation
-        val baseFare = when {
-            distance <= 2.0 -> 30.0  // Short distance base fare
-            distance <= 5.0 -> 50.0  // Medium distance base fare
-            distance <= 10.0 -> 70.0 // Long distance base fare
-            else -> 70.0 + (distance - 10.0) * 5.0 // Extra distance charge
-        }
+        // Base rate of 20 KSH per kilometer
+        val baseFare = distance * 20.0
         
         var finalFare = baseFare
         

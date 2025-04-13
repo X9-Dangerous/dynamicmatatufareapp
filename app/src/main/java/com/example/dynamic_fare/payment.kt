@@ -42,6 +42,11 @@ fun PaymentPage(
     var isDisabled by remember { mutableStateOf(false) }
     var originalFare by remember { mutableStateOf<String?>(null) }
     
+    // New state for success dialog
+    var showSuccessDialog by remember { mutableStateOf(false) }
+    var successMessage by remember { mutableStateOf("") }
+    var successAmount by remember { mutableStateOf("") }
+    
     // Use the provided userId parameter
     android.util.Log.d("Payment", "Using userId: $userId")
     
@@ -223,6 +228,35 @@ fun PaymentPage(
         }
     }
 
+    // Success Dialog
+    if (showSuccessDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showSuccessDialog = false
+                onPaymentSuccess()
+                navController.navigate(Routes.matatuEstimateRoute()) {
+                    popUpTo(Routes.matatuEstimateRoute()) { inclusive = true }
+                }
+            },
+            title = { Text("Payment Successful") },
+            text = { Text("Your payment of KES $successAmount has been processed successfully.\n$successMessage") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSuccessDialog = false
+                        onPaymentSuccess()
+                        navController.navigate(Routes.matatuEstimateRoute()) {
+                            popUpTo(Routes.matatuEstimateRoute()) { inclusive = true }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B51F5))
+                ) {
+                    Text("OK", color = Color.White)
+                }
+            }
+        )
+    }
+
     // UI Elements
     Column(
         modifier = Modifier
@@ -382,12 +416,11 @@ fun PaymentPage(
 
                             database.child(paymentId).setValue(payment)
                                 .addOnSuccessListener {
-                                    // Show success message and navigate back
                                     android.util.Log.d("Payment", "Payment saved to history")
-                                    onPaymentSuccess()
-                                    navController.navigate(Routes.matatuEstimateRoute()) {
-                                        popUpTo(Routes.matatuEstimateRoute()) { inclusive = true }
-                                    }
+                                    // Update dialog state instead of showing dialog directly
+                                    successAmount = validFare.toString()
+                                    successMessage = message
+                                    showSuccessDialog = true
                                 }
                                 .addOnFailureListener { e ->
                                     android.util.Log.e("Payment", "Failed to save payment: ${e.message}")

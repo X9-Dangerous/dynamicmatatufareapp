@@ -8,7 +8,13 @@ import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
 
-
+/**
+ * Process M-Pesa payment for a user.
+ *
+ * @param userPhone User's phone number.
+ * @param fareAmount Fare amount to be paid.
+ * @param mpesaDetails M-Pesa payment details.
+ */
 fun processMpesaPayment(userPhone: String, fareAmount: String?, mpesaDetails: Map<String, String>?) {
     if (userPhone.isEmpty() || fareAmount.isNullOrEmpty() || mpesaDetails.isNullOrEmpty()) {
         Log.e("M-Pesa", "⚠️ Payment Error: Missing details")
@@ -30,8 +36,8 @@ fun processMpesaPayment(userPhone: String, fareAmount: String?, mpesaDetails: Ma
         }
 
         val timestamp = SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault()).format(Date())
-        val businessShortCode = BuildConfig.BUSINESS_SHORT_CODE  // Load from local.properties
-        val passkey = BuildConfig.PASSKEY
+        val businessShortCode = mpesaDetails["businessShortCode"] ?: ""
+        val passkey = mpesaDetails["password"] ?: ""
         val password = Base64.encodeToString("$businessShortCode$passkey$timestamp".toByteArray(), Base64.NO_WRAP)
 
         val jsonObject = JSONObject().apply {
@@ -39,12 +45,12 @@ fun processMpesaPayment(userPhone: String, fareAmount: String?, mpesaDetails: Ma
             put("Password", password)
             put("Timestamp", timestamp)
             put("TransactionType", "CustomerPayBillOnline")
-            put("Amount", fareAmount.toInt())
+            put("Amount", fareAmount)
             put("PartyA", userPhone)
             put("PartyB", payTo)
             put("PhoneNumber", userPhone)
-            put("CallBackURL", "https://your-server.com/mpesa-callback")
-            put("AccountReference", "MatatuFare")
+            put("CallBackURL", "https://123b-197-136-113-30.ngrok-free.app/mpesa-callback")
+            put("AccountReference", "DynamicFare")
             put("TransactionDesc", "Matatu Fare Payment")
         }
 
@@ -71,6 +77,11 @@ fun processMpesaPayment(userPhone: String, fareAmount: String?, mpesaDetails: Ma
     }
 }
 
+/**
+ * Get M-Pesa access token.
+ *
+ * @param callback Callback function to receive the access token.
+ */
 fun getMpesaAccessToken(callback: (String?) -> Unit) {
     val consumerKey = BuildConfig.MPESA_CONSUMER_KEY
     val consumerSecret = BuildConfig.MPESA_CONSUMER_SECRET

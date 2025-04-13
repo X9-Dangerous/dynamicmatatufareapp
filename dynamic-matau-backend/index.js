@@ -21,7 +21,7 @@ data class ResponseData(val success: Boolean, val message: String)
 
 // Retrofit Instance
 val retrofit = Retrofit.Builder()
-    .baseUrl("https://f224-197-254-4-166.ngrok-free.app/")  // Ensure it ends with "/"
+    .baseUrl("https://123b-197-136-113-30.ngrok-free.app/")  // Ensure it ends with "/"
     .addConverterFactory(GsonConverterFactory.create())
     .build()
 

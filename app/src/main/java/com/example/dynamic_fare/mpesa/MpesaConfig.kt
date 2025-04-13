@@ -12,7 +12,7 @@ object MpesaConfig {
     // Business details
     const val BUSINESS_SHORT_CODE = "174379" // Your Lipa Na M-Pesa shortcode
     const val PASSKEY = "your_passkey"
-    const val CALLBACK_URL = "https://your-callback-url.com/callback"
+    const val CALLBACK_URL = "https://123b-197-136-113-30.ngrok-free.app/mpesa-callback"
     const val TRANSACTION_TYPE = "CustomerPayBillOnline"
     const val ACCOUNT_REFERENCE = "DynamicFare"
     const val TRANSACTION_DESC = "Payment for matatu fare"
