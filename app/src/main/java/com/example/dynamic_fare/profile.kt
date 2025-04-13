@@ -37,7 +37,7 @@ fun ProfileScreen(navController: NavController, userId: String) {
     val currentUser = auth.currentUser
     val userRepository = remember { UserRepository() }
     val coroutineScope = rememberCoroutineScope()
-    
+
     var userData by remember { mutableStateOf<UserData?>(null) }
     var operatorData by remember { mutableStateOf<OperatorData?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -59,13 +59,13 @@ fun ProfileScreen(navController: NavController, userId: String) {
             coroutineScope.launch {
                 // Use the currently authenticated user's ID
                 val targetUserId = if (currentUser.uid == userId) userId else currentUser.uid
-                
+
                 try {
                     // Fetch user data
                     userRepository.fetchUserData(targetUserId).onSuccess { user ->
                         userData = user
                         profilePicUrl = user.profilePicUrl
-                        
+
                         // If user is an operator, fetch operator details
                         if (user.role.equals("operator", ignoreCase = true)) {
                             userRepository.fetchOperatorData(targetUserId).onSuccess { operator ->
@@ -184,7 +184,7 @@ fun ProfileScreen(navController: NavController, userId: String) {
                         ProfileSection("Email", user.email)
                         ProfileSection("Phone", user.phoneNumber)
                         ProfileSection("Role", user.role)
-                        
+
                         // Show operator-specific information if role is operator
                         if (user.role.equals("operator", ignoreCase = true)) {
                             operatorData?.let { operator ->
