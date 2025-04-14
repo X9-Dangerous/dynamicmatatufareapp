@@ -14,7 +14,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,9 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
@@ -59,6 +60,7 @@ import java.io.IOException
 import android.graphics.Color as AndroidColor
 import java.text.DecimalFormat
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MatatuEstimateScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
@@ -74,6 +76,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var directLine by remember { mutableStateOf<List<GeoPoint>?>(null) }
     var mapView by remember { mutableStateOf<MapView?>(null) }
+    var showFareTable by remember { mutableStateOf(false) }
 
     // Auto-suggestion states
     var startingSuggestions by remember { mutableStateOf<List<GtfsStopSuggestion>>(emptyList()) }
@@ -121,8 +124,14 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
         }
     }
 
+    // Initialize fare estimator
+    val fareEstimator = remember { 
+        Log.d("FARE_DEBUG", "Creating new FareEstimator instance")
+        FareEstimator().apply {
+            Log.d("FARE_DEBUG", "FareEstimator instance created")
+        }
+    }
     var estimatedFare by remember { mutableStateOf<EstimatedFare?>(null) }
-    val fareEstimator = remember { FareEstimator() }
     val scope = rememberCoroutineScope()
 
     fun fetchRoute(start: GeoPoint, end: GeoPoint) {
@@ -135,8 +144,8 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
 
         // Calculate direct distance
         val directDistanceInMeters = calculateDistance(start.latitude, start.longitude, end.latitude, end.longitude)
-        routeDistance = directDistanceInMeters / 1000 // Convert to kilometers for display
-        routeDuration = (directDistanceInMeters / 1000) / 40 * 60 // Rough estimate: 40 km/h average speed, converted to minutes
+        routeDistance = directDistanceInMeters  // Keep in meters
+        routeDuration = directDistanceInMeters / (40.0 * 1000.0 / 3600.0) // 40 km/h converted to m/s
 
         // Get fare estimate
         scope.launch {
@@ -156,7 +165,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                     endLon = end.longitude,
                     isRainyWeather = isRaining,
                     isPeakHour = isPeakTime,
-                    routeDistance = routeDistance ?: 0.0
+                    routeDistance = routeDistance?.div(1000.0) ?: 0.0  // Convert to km here for fare calculation
                 )
             } catch (e: Exception) {
                 Log.e("FARE_ESTIMATE", "Error estimating fare: ${e.message}")
@@ -206,6 +215,10 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                             // Extract distance and duration
                             val distanceInMeters = firstRoute.getDouble("distance")
                             val durationInSeconds = firstRoute.getDouble("duration")
+                            
+                            // Update route distance and duration
+                            routeDistance = distanceInMeters  // Keep in meters
+                            routeDuration = durationInSeconds / 60.0  // Convert to minutes
 
                             // Extract directions from steps
                             val legs = firstRoute.getJSONArray("legs")
@@ -255,11 +268,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                                         routePoints = directLine ?: listOf(start, end)
                                     }
 
-                                    routeDistance = distanceInMeters / 1000 // Convert to kilometers
-                                    routeDuration = durationInSeconds / 60 // Convert to minutes
-                                    routeDirections = directions
-                                    isLoading = false
-                                    Log.d("ROUTE_INFO", "Distance: ${distanceInMeters/1000} km, Duration: ${durationInSeconds/60} min")
+                                    Log.d("ROUTE_INFO", "Distance: ${distanceInMeters} meters, Duration: ${durationInSeconds/60} min")
 
                                     // Show a success toast
                                     Toast.makeText(context, "Route loaded successfully", Toast.LENGTH_SHORT).show()
@@ -321,7 +330,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                 fontSize = 25.sp,
                 color = Color.Black
             )
-            
+
             if (estimatedFare != null) {
                 Card(
                     modifier = Modifier
@@ -717,7 +726,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                                             }
 
                                             // Create text with labels
-                                            val distanceText = "Distance: ${DecimalFormat("#.#").format(distance)} km"
+                                            val distanceText = "Distance: ${DecimalFormat("#.#").format(distance / 1000)} km"
                                             val timeText = if (duration != null) {
                                                 "Estimated Time: ${DecimalFormat("#.#").format(duration)} min"
                                             } else {
@@ -814,7 +823,71 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Show fare table button when route is selected
+        if (routeDistance != null) {
+            Button(
+                onClick = { showFareTable = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF9B51E0)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Timeline,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "View Fare Estimates",
+                        fontSize = 16.sp,
+                        color = Color.White
+                    )
+                }
+            }
+
+            // Fare table dialog
+            if (showFareTable) {
+                AlertDialog(
+                    onDismissRequest = { showFareTable = false },
+                    properties = DialogProperties(
+                        dismissOnBackPress = true,
+                        dismissOnClickOutside = true,
+                        usePlatformDefaultWidth = false
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth(0.95f)
+                        .padding(16.dp),
+                    content = {
+                        // Pass the distance directly without conversion since it's already in kilometers
+                        Log.d("FARE_DEBUG", "Route distance: $routeDistance meters")
+                        if (startingLocation != null && destinationLocation != null) {
+                            FareTable(
+                                distance = routeDistance?.div(1000.0) ?: 0.0,  // Convert to km here for fare calculation
+                                startPoint = startingLocation!!,
+                                endPoint = destinationLocation!!,
+                                onDismiss = { showFareTable = false },
+                                fareEstimator = fareEstimator
+                            )
+                        } else {
+                            Text("Error: Start or end location is missing")
+                        }
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Pay Button
         Button(

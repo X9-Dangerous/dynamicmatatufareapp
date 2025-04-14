@@ -113,23 +113,23 @@ class FareEstimator {
     }
 
     private fun estimateBasedOnDistance(distance: Double, isPeakHour: Boolean, isRainyWeather: Boolean): Double {
-        // Base rate of 20 KSH per kilometer
-        val baseFare = distance * 20.0
+        // Base rate of 4.5 KSH per kilometer (drastically reduced)
+        val baseFare = distance * 4.5
         
         var finalFare = baseFare
         
-        // Add peak hour surge (20% increase)
+        // Add peak hour surge (5% increase, drastically reduced)
         if (isPeakHour) {
-            finalFare *= 1.2
+            finalFare *= 1.05
         }
         
-        // Add rainy weather surge (10% increase)
+        // Add rainy weather surge (3% increase)
         if (isRainyWeather) {
-            finalFare *= 1.1
+            finalFare *= 1.03
         }
         
-        // Round to nearest 10 shillings
-        return (finalFare / 10.0).toInt() * 10.0
+        // Round to nearest 5 shillings instead of 10 for more precise pricing
+        return (finalFare / 5.0).toInt() * 5.0
     }
 
     private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
