@@ -258,7 +258,7 @@ fun FleetDetailItem(fleet: Fleet, navController: NavController, operatorId: Stri
             .fillMaxWidth()
             .padding(8.dp)
             .clickable {
-                navController.navigate(Routes.fleetRegistrationRoute(operatorId))
+                navController.navigate(route = Routes.fleetDetailsRoute(fleet.fleetId))
             },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {

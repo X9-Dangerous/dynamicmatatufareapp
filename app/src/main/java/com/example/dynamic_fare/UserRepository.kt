@@ -51,10 +51,22 @@ class UserRepository {
             val snapshot = database.child(userId).get().await()
 
             if (snapshot.exists()) {
+                // Log all children of the snapshot for debugging
+                Log.d("UserRepository", "Raw snapshot value: ${snapshot.value}")
+                snapshot.children.forEach { child ->
+                    Log.d("UserRepository", "Found field: ${child.key} with value: ${child.value}")
+                }
+
+                // Try both 'phoneNumber' and 'phone' fields
+                val phone = snapshot.child("phone").getValue(String::class.java) 
+                    ?: snapshot.child("phoneNumber").getValue(String::class.java)
+                    ?: ""
+                Log.d("UserRepository", "Found phone value: $phone")
+
                 val userData = UserData(
                     name = snapshot.child("name").getValue(String::class.java) ?: "",
                     email = snapshot.child("email").getValue(String::class.java) ?: "",
-                    phoneNumber = snapshot.child("phoneNumber").getValue(String::class.java) ?: "",
+                    phoneNumber = phone,
                     role = snapshot.child("role").getValue(String::class.java) ?: "",
                     profilePicUrl = snapshot.child("profilePicUrl").getValue(String::class.java)
                 )

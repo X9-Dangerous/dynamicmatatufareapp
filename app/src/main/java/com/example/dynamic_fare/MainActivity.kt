@@ -14,20 +14,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.dynamic_fare.ui.screens.RegistrationScreen
-import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.example.dynamic_fare.ui.screens.*
-import com.example.dynamic_fare.ClientProfileScreen
+import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.example.dynamic_fare.ui.ChooseFleetDialog
 import com.example.dynamic_fare.ui.FleetRegistrationScreen
-import com.example.dynamic_fare.MatatuEstimateScreen
-import com.example.dynamic_fare.ProfileScreen
+import com.example.dynamic_fare.data.SettingsDataStore
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import com.example.dynamic_fare.data.SettingsDataStore
-import com.example.dynamic_fare.ui.screens.setLocale
 import kotlinx.coroutines.launch
-
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,13 +31,9 @@ class MainActivity : ComponentActivity() {
         val auth = FirebaseAuth.getInstance()
         val db = FirebaseDatabase.getInstance().reference
         val operatorId = auth.currentUser?.uid ?: ""
-        val database = AppDatabase.getDatabase(this)
         val fareManager = FareManager(FirebaseDatabase.getInstance())
         val timeManager = TimeManager()
         val weatherManager = WeatherManager()
-        val getMatatuIdFromRegistration = fareManager::getMatatuIdFromRegistration
-
-
 
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -90,10 +80,108 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("userId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val userId = backStackEntry.arguments?.getString("userId") ?: ""
-                        QRScannerScreen(
+                        QRScannerScreen(navController = navController, userId = userId)
+                    }
+
+                    composable(Routes.MatatuEstimateScreen) { MatatuEstimateScreen(navController = navController) }
+                    composable(Routes.PasswordRecoveryScreen) { PasswordRecoveryScreen(navController) }
+
+                    composable(
+                        route = Routes.MatatuDetailsScreen,
+                        arguments = listOf(navArgument("matatuId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
+                        MatatuDetailsScreen(navController = navController, matatuId = matatuId)
+                    }
+
+                    composable(Routes.FareDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) { backStackEntry ->
+                        FareDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
+                    }
+
+                    composable(Routes.SetFaresScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) { backStackEntry ->
+                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
+                        SetFaresScreen(matatuId)
+                    }
+
+                    composable(Routes.FareTabbedScreen) { backStackEntry ->
+                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
+                        FareTabbedScreen(navController, matatuId)
+                    }
+
+                    composable(Routes.SettingsScreen, arguments = listOf(
+                        navArgument("userId") { type = NavType.StringType }
+                    )) { backStackEntry ->
+                        val id = backStackEntry.arguments?.getString("userId") ?: operatorId
+                        SettingsScreen(navController, id)
+                    }
+
+                    composable(Routes.ChooseFleetDialog) {
+                        ChooseFleetDialog(
+                            onDismiss = { navController.popBackStack() },
+                            onSelection = { isFleet ->
+                                val route = if (isFleet) {
+                                    "fleetRegistration/$operatorId"
+                                } else {
+                                    "matatuRegistration/$operatorId"
+                                }
+                                navController.navigate(route)
+                            }
+                        )
+                    }
+
+                    composable(
+                        route = Routes.PaymentPage,
+                        arguments = listOf(
+                            navArgument("scannedQRCode") { type = NavType.StringType },
+                            navArgument("userId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        val scannedQRCode = backStackEntry.arguments?.getString("scannedQRCode") ?: ""
+                        val userId = backStackEntry.arguments?.getString("userId") ?: operatorId
+                        Log.d("MainActivity", "Payment page userId: $userId")
+                        PaymentPage(
                             navController = navController,
+                            scannedQRCode = scannedQRCode,
+                            fareManager = fareManager,
+                            timeManager = timeManager,
+                            weatherManager = weatherManager,
+                            getMatatuIdFromRegistration = { regNo, callback ->
+                                fareManager.getMatatuIdFromRegistration(regNo, callback)
+                            },
                             userId = userId
                         )
+                    }
+
+                    composable(
+                        route = Routes.NotificationsScreen,
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                        PaymentHistoryScreen(navController = navController, userId = userId)
+                    }
+
+                    composable(
+                        route = Routes.FleetDetailsScreen,
+                        arguments = listOf(navArgument("fleetId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val fleetId = backStackEntry.arguments?.getString("fleetId") ?: ""
+                        FleetDetailsScreen(navController = navController, fleetId = fleetId)
+                    }
+
+                    composable(
+                        route = Routes.AccessibilitySettingsScreen,
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                        AccessibilitySettingsScreen(navController = navController, userId = userId)
+                    }
+
+                    composable(
+                        route = Routes.ProfileScreen,
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                        ProfileScreen(navController = navController, userId = userId)
                     }
 
                     composable(
@@ -132,118 +220,18 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable(
-                        route = Routes.ProfileScreen,
-                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val userId = backStackEntry.arguments?.getString("userId")
-                        ProfileScreen(navController, userId = userId ?: "")
-                    }
-
-                    composable(
                         route = Routes.ClientProfileScreen,
                         arguments = listOf(navArgument("userId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val userId = backStackEntry.arguments?.getString("userId") ?: ""
                         ClientProfileScreen(navController = navController)
                     }
-
-                    composable(
-                        route = Routes.FareTabbedScreen,
-                        arguments = listOf(navArgument("matatuId") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
-                        FareTabbedScreen(navController, matatuId)
-                    }
-
-                    composable(
-                        route = Routes.DetailMatatu,
-                        arguments = listOf(navArgument("matatuId") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
-                        MatatuDetailsScreen(navController, matatuId)
-                    }
-                    composable(Routes.MatatuEstimateScreen) { MatatuEstimateScreen(navController = navController) }
-                    composable(Routes.PasswordRecoveryScreen) { PasswordRecoveryScreen(navController) }
-                    composable(Routes.SetFaresScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) { backStackEntry ->
-                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
-                        SetFaresScreen(matatuId)
-                    }
-                    composable(Routes.FareTabbedScreen) { backStackEntry ->
-                        val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
-                        FareTabbedScreen(navController, matatuId)
-                    }
-                    composable(Routes.SettingsScreen, arguments = listOf(
-                        navArgument("userId") { type = NavType.StringType }
-                    )) { backStackEntry ->
-                        val id = backStackEntry.arguments?.getString("userId") ?: operatorId
-                        SettingsScreen(navController, id)
-                    }
-
-                    composable(Routes.ChooseFleetDialog) {
-                        ChooseFleetDialog(
-                            onDismiss = { navController.popBackStack() },
-                            onSelection = { isFleet ->
-                                val route = if (isFleet) {
-                                    "fleetRegistration/$operatorId"
-                                } else {
-                                    "matatuRegistration/$operatorId"
-                                }
-                                navController.navigate(route)
-                            }
-                        )
-                    }
-
-                    composable(
-                        Routes.PaymentPage,
-                        arguments = listOf(
-                            navArgument("scannedQRCode") { type = NavType.StringType },
-                            navArgument("userId") { type = NavType.StringType }
-                        )
-                    ) { backStackEntry ->
-                        val scannedQRCode = backStackEntry.arguments?.getString("scannedQRCode") ?: ""
-                        val userId = backStackEntry.arguments?.getString("userId") ?: operatorId
-                        Log.d("MainActivity", "Payment page userId: $userId")
-                        PaymentPage(
-                            navController = navController,
-                            scannedQRCode = scannedQRCode,
-                            fareManager = fareManager,
-                            timeManager = timeManager,
-                            weatherManager = weatherManager,
-                            getMatatuIdFromRegistration = { regNo, callback ->
-                                fareManager.getMatatuIdFromRegistration(regNo, callback)
-                            },
-                            userId = userId
-                        )
-                    }
-
-                    composable(
-                        route = Routes.NotificationsScreen,
-                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
-                        PaymentHistoryScreen(navController = navController, userId = userId)
-                    }
-
-                    composable(
-                        route = "accessibility/{userId}",
-                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
-                        AccessibilitySettingsScreen(navController = navController, userId = userId)
-                    }
-
                 }
             }
         }
-
-
-
-
-                }
-            }
-
-
+    }
 
     private fun getMatatuIdFromRegistration(registration: String) {
-
+        // Implementation here
     }
+}

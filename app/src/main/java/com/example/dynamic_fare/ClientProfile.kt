@@ -9,8 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -72,53 +72,25 @@ fun ClientProfileScreen(navController: NavController) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isUploadingImage by remember { mutableStateOf(false) }
 
-    // Get current user ID from Firebase Auth
+    // Firebase references
     val auth = FirebaseAuth.getInstance()
+    val database = FirebaseDatabase.getInstance()
+    val storage = FirebaseStorage.getInstance()
     val currentUser = auth.currentUser
     val userId = currentUser?.uid
 
     val context = LocalContext.current
 
-    // Function to handle image upload to Firebase Storage
-    val handleImageUpload = { imageUri: Uri? ->
-        if (imageUri != null && userId != null) {
-            isUploadingImage = true
+    // Cleanup function for Firebase listeners
+    val valueEventListener = remember { mutableStateOf<ValueEventListener?>(null) }
 
-            // Reference to Firebase Storage
-            val storageRef = FirebaseStorage.getInstance().reference
-            val profileImageRef = storageRef.child("profile_images/$userId.jpg")
-
-            // Upload the image
-            val uploadTask = profileImageRef.putFile(imageUri)
-            uploadTask.continueWithTask { task ->
-                if (!task.isSuccessful) {
-                    task.exception?.let { throw it }
-                }
-                profileImageRef.downloadUrl
-            }.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    // Get the download URL
-                    val downloadUrl = task.result.toString()
-
-                    // Update the profile URL in the database
-                    val database = FirebaseDatabase.getInstance().reference
-                    val userRef = database.child("users").child(userId)
-                    userRef.child("profilePicUrl").setValue(downloadUrl)
-                        .addOnSuccessListener {
-                            // Update local state
-                            profilePicUrl = downloadUrl
-                            isUploadingImage = false
-                            Toast.makeText(context, "Profile picture updated successfully", Toast.LENGTH_SHORT).show()
-                        }
-                        .addOnFailureListener { e ->
-                            isUploadingImage = false
-                            errorMessage = "Failed to update profile picture: ${e.message}"
-                            Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
-                        }
-                } else {
-                    isUploadingImage = false
-                    errorMessage = "Failed to upload image: ${task.exception?.message}"
-                    Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+    // Cleanup when leaving the screen
+    DisposableEffect(Unit) {
+        onDispose {
+            // Remove the database listener
+            valueEventListener.value?.let { listener ->
+                userId?.let { uid ->
+                    database.getReference("users/$uid").removeEventListener(listener)
                 }
             }
         }
@@ -128,140 +100,153 @@ fun ClientProfileScreen(navController: NavController) {
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        handleImageUpload(uri)
+        if (uri != null && userId != null) {
+            isUploadingImage = true
+
+            // Reference to Firebase Storage
+            val storageRef = storage.reference
+            val imageRef = storageRef.child("profile_images/$userId.jpg")
+
+            imageRef.putFile(uri)
+                .addOnSuccessListener { taskSnapshot ->
+                    // Get the download URL
+                    imageRef.downloadUrl.addOnSuccessListener { downloadUri ->
+                        // Update the profile URL in the database
+                        val userRef = database.getReference("users/$userId")
+                        userRef.child("profilePicUrl").setValue(downloadUri.toString())
+                            .addOnSuccessListener {
+                                profilePicUrl = downloadUri.toString()
+                                Toast.makeText(context, "Profile picture updated successfully", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { e ->
+                                Toast.makeText(context, "Failed to update profile URL: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(context, "Failed to upload image: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+                .addOnCompleteListener {
+                    isUploadingImage = false
+                }
+        }
     }
 
-    // Function to handle logout
-    val onLogout = {
-        // Sign out from Firebase Auth
-        auth.signOut()
+    // Fetch user data
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            val userRef = database.getReference("users/$userId")
+            val listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (snapshot.exists()) {
+                        username = snapshot.child("name").getValue(String::class.java) ?: "Unknown"
+                        email = snapshot.child("email").getValue(String::class.java) ?: ""
+                        phoneNumber = snapshot.child("phone").getValue(String::class.java) ?: ""
+                        profilePicUrl = snapshot.child("profilePicUrl").getValue(String::class.java) ?: ""
+                        isLoading = false
+                    }
+                }
 
-        // Navigate back to login
-        navController.navigate(Routes.LoginScreenContent) {
+                override fun onCancelled(error: DatabaseError) {
+                    errorMessage = "Failed to load profile: ${error.message}"
+                    isLoading = false
+                }
+            }
+            
+            // Store the listener reference for cleanup
+            valueEventListener.value = listener
+            userRef.addValueEventListener(listener)
+        }
+    }
+
+    // Function to handle logout with proper cleanup
+    val onLogout: () -> Unit = {
+        // Remove the database listener
+        valueEventListener.value?.let { listener ->
+            userId?.let { uid ->
+                database.getReference("users/$uid").removeEventListener(listener)
+            }
+        }
+        
+        // Sign out from Firebase
+        auth.signOut()
+        
+        // Navigate to login and clear the back stack
+        navController.navigate("login") {
             popUpTo(0) { inclusive = true }
         }
     }
 
-    // Effect to fetch user data when component is first loaded
-    LaunchedEffect(userId) {
-        if (userId != null) {
-            val database = FirebaseDatabase.getInstance().reference
-            val userRef = database.child("users").child(userId)
-
-            userRef.addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    if (snapshot.exists()) {
-                        // Extract user details
-                        username = snapshot.child("name").getValue(String::class.java) ?: "Client User"
-                        email = snapshot.child("email").getValue(String::class.java) ?: currentUser.email ?: ""
-                        phoneNumber = snapshot.child("phone").getValue(String::class.java) ?: ""
-                        profilePicUrl = snapshot.child("profilePicUrl").getValue(String::class.java) ?: ""
-                    } else {
-                        // Use Firebase Auth data as fallback
-                        username = currentUser?.displayName ?: "Client User"
-                        email = currentUser?.email ?: ""
-                    }
-                    isLoading = false
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    Log.e("ClientProfile", "Error fetching user data: ${error.message}")
-                    errorMessage = "Could not load profile: ${error.message}"
-                    isLoading = false
-                }
-            })
-        } else {
-            // No logged in user
-            errorMessage = "No user logged in"
-            isLoading = false
-        }
-    }
-
-    ProfileScreen(
-        username = username,
-        email = email,
-        phoneNumber = phoneNumber,
-        profilePicUrl = profilePicUrl,
-        isLoading = isLoading || isUploadingImage,
-        errorMessage = errorMessage,
-        onLogout = onLogout,
-        onProfilePictureClick = { imagePickerLauncher.launch("image/*") },
-        navController = navController
-    )
-}
-
-@Composable
-fun ProfileScreen(
-    username: String,
-    email: String = "user@example.com",
-    phoneNumber: String = "+254 712 345 678",
-    profilePicUrl: String = "",
-    isLoading: Boolean = false,
-    errorMessage: String? = null,
-    onLogout: () -> Unit,
-    onProfilePictureClick: () -> Unit = {},
-    navController: NavController
-) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.systemBars) ,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .background(Color.White)
     ) {
-        // Profile Picture and Username
+        // Profile Header
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-                // Add padding for system bars
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Editable profile picture with overlay
-            Box(modifier = Modifier
-                .size(90.dp)
-                .clickable { onProfilePictureClick() }
+            // Profile Picture with loading state
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray)
+                    .clickable { imagePickerLauncher.launch("image/*") }
             ) {
-                // Profile image
-                Image(
-                    painter = if (profilePicUrl.isNotEmpty()) {
-                        rememberAsyncImagePainter(profilePicUrl) // Load from URL
-                    } else {
-                        painterResource(id = R.drawable.ic_acccount) // Default profile image
-                    },
-                    contentDescription = "Profile Picture",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color.Gray, shape = CircleShape)
-                        .border(2.dp, Color.LightGray, CircleShape)
-                )
-
-                // Edit overlay
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                        .border(1.dp, Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit profile picture",
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
+                if (isUploadingImage) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .align(Alignment.Center)
+                    )
+                } else {
+                    Image(
+                        painter = if (profilePicUrl.isNotEmpty()) {
+                            rememberAsyncImagePainter(profilePicUrl) // Load from URL
+                        } else {
+                            painterResource(id = R.drawable.ic_acccount) // Default profile image
+                        },
+                        contentDescription = "Profile Picture",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            Text(
-                text = username,
-                fontSize = 20.sp,
-                color = Color.Black
-            )
+            // Username and Edit Icon
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = username,
+                    fontSize = 20.sp,
+                    color = Color.Black
+                )
+
+                IconButton(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit profile picture",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -271,7 +256,6 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
-                // Add padding for system bars
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
         ) {

@@ -107,7 +107,7 @@ class WeatherManager {
             // Update cache with new weather data
             cachedWeather = isRaining
             lastFetchTime = currentTime
-            
+
             android.util.Log.d("WeatherManager", "Updated weather data: isRaining=$isRaining")
             callback(isRaining)
         }
@@ -163,5 +163,6 @@ fun processQrScan(
 // Assuming Matatu class has fields `matatuID` and `registrationNumber`
 data class Matatu(
     val matatuId: String = "",
-    val registrationNumber: String = ""
+    val registrationNumber: String = "",
+    val fleetId: String = ""  // Added fleetId field
 )

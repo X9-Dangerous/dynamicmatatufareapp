@@ -174,7 +174,7 @@ fun SetFaresScreen(matatuId: String) {
 
                     if (resultMessage == "✅ Fares saved successfully!") {
                         Handler(Looper.getMainLooper()).post {
-                            // Navigate back to DetailMatatu
+                            // Navigate back to MatatuDetailsScreen
                             val intent = Intent(context, FareTabbedActivity::class.java).apply {
                                 putExtra("matatuId", matatuId)
                                 // Clear the back stack

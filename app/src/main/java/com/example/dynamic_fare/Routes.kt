@@ -15,8 +15,6 @@ object Routes {
     const val LoginScreenContent = "login"
     const val SignUpScreen = "signup"
     const val MatatuEstimateScreen = "clientHome"
-    
-    fun matatuEstimateRoute(): String = "clientHome"
     const val PasswordRecoveryScreen = "passwordRecovery"
     const val OperatorHome = "operatorHomeScreen/{operatorId}"
     const val HomeScreen = "home/{userId}"
@@ -24,7 +22,6 @@ object Routes {
     const val RegistrationScreen = "registration/{operatorId}"
     const val ChooseFleetDialog = "chooseFleet/{operatorId}"
     const val FleetRegistrationScreen = "fleetRegistration/{operatorId}"
-    const val DetailMatatu = "detailMatatu/{matatuId}"
     const val FleetDetailsScreen = "fleetDetails/{fleetId}"
     const val ProfileScreen = "profile/{userId}"
     const val MatatuInfoScreen = "matatuInfoScreen/{operatorId}/{matatuId}"
@@ -40,12 +37,13 @@ object Routes {
     const val AccessibilitySettingsScreen = "accessibility/{userId}"
     const val ClientProfileScreen = "clientProfile/{userId}"
 
+    fun matatuEstimateRoute(): String = "clientHome"
     fun operatorHomeRoute(operatorId: String): String = "operatorHomeScreen/$operatorId"
     fun homeRoute(userId: String): String = "home/$userId"
     fun qrScannerRoute(userId: String): String = "qrScanner/$userId"
     fun registrationRoute(operatorId: String, fleetId: String = ""): String = "registration/$operatorId?fleetId=$fleetId"
     fun fleetRegistrationRoute(operatorId: String): String = "fleetRegistration/$operatorId"
-    fun detailMatatuRoute(matatuId: String): String = "detailMatatu/$matatuId"
+    fun fleetDetailsRoute(fleetId: String): String = "fleetDetails/$fleetId"
     fun fareTabbedRoute(matatuId: String): String = "fare_tabbed_screen/$matatuId"
     fun profileRoute(userId: String): String = "profile/$userId"
     fun paymentPageWithQRCode(scannedQRCode: String, userId: String): String = "paymentPage/$scannedQRCode/$userId"
@@ -165,11 +163,11 @@ fun AppNavigation(
         }
 
         composable(
-            route = Routes.DetailMatatu,
+            route = "detailMatatu/{matatuId}",
             arguments = listOf(navArgument("matatuId") { type = NavType.StringType })
         ) { backStackEntry ->
             val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
-            FareTabbedScreen(navController, matatuId)
+            MatatuDetailsScreen(navController = navController, matatuId = matatuId)
         }
 
         composable(

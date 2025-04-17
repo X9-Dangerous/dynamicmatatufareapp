@@ -1,5 +1,6 @@
 package com.example.dynamic_fare
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,8 +28,13 @@ import com.example.dynamic_fare.auth.UserRepository
 import com.example.dynamic_fare.auth.UserData
 import com.example.dynamic_fare.auth.OperatorData
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
+import com.google.firebase.database.FirebaseDatabase
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,12 +43,49 @@ fun ProfileScreen(navController: NavController, userId: String) {
     val currentUser = auth.currentUser
     val userRepository = remember { UserRepository() }
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var userData by remember { mutableStateOf<UserData?>(null) }
     var operatorData by remember { mutableStateOf<OperatorData?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var profilePicUrl by remember { mutableStateOf<String?>(null) }
+    var isUploadingImage by remember { mutableStateOf(false) }
+
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            isUploadingImage = true
+            val storage = FirebaseStorage.getInstance()
+            val storageRef = storage.reference
+            val imageRef = storageRef.child("profile_images/${currentUser?.uid}.jpg")
+
+            imageRef.putFile(uri)
+                .addOnSuccessListener { taskSnapshot ->
+                    // Get the download URL
+                    imageRef.downloadUrl.addOnSuccessListener { downloadUri ->
+                        // Update the profile URL in the database
+                        val userRef = FirebaseDatabase.getInstance().getReference("users/${currentUser?.uid}")
+                        userRef.child("profilePicUrl").setValue(downloadUri.toString())
+                            .addOnSuccessListener {
+                                profilePicUrl = downloadUri.toString()
+                                Toast.makeText(context, "Profile picture updated successfully", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { e ->
+                                Toast.makeText(context, "Failed to update profile URL: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(context, "Failed to upload image: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+                .addOnCompleteListener {
+                    isUploadingImage = false
+                }
+        }
+    }
 
     // Check if user is authenticated
     if (currentUser == null) {
@@ -57,27 +100,31 @@ fun ProfileScreen(navController: NavController, userId: String) {
     LaunchedEffect(userId) {
         if (userId.isNotEmpty()) {
             coroutineScope.launch {
-                // Use the currently authenticated user's ID
                 val targetUserId = if (currentUser.uid == userId) userId else currentUser.uid
 
                 try {
-                    // Fetch user data
+                    android.util.Log.d("Profile", "Fetching user data for ID: $targetUserId")
                     userRepository.fetchUserData(targetUserId).onSuccess { user ->
+                        android.util.Log.d("Profile", "User data fetched: ${user.name}, phone: ${user.phoneNumber}")
                         userData = user
                         profilePicUrl = user.profilePicUrl
 
-                        // If user is an operator, fetch operator details
                         if (user.role.equals("operator", ignoreCase = true)) {
+                            android.util.Log.d("Profile", "User is an operator, fetching operator data")
                             userRepository.fetchOperatorData(targetUserId).onSuccess { operator ->
                                 operatorData = operator
+                                android.util.Log.d("Profile", "Operator data fetched: ${operator.businessName}")
                             }.onFailure { e ->
+                                android.util.Log.e("Profile", "Failed to load operator data: ${e.message}")
                                 error = "Failed to load operator data: ${e.message}"
                             }
                         }
                     }.onFailure { e ->
+                        android.util.Log.e("Profile", "Failed to load user data: ${e.message}")
                         error = "Failed to load user data: ${e.message}"
                     }
                 } catch (e: Exception) {
+                    android.util.Log.e("Profile", "Error: ${e.message}")
                     error = "Error: ${e.message}"
                 } finally {
                     isLoading = false
@@ -143,35 +190,52 @@ fun ProfileScreen(navController: NavController, userId: String) {
                         .fillMaxSize()
                         .padding(16.dp)
                 ) {
-                    // Profile Picture
-                    Box(
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .align(Alignment.CenterHorizontally)
+                    // Profile Picture Section with upload functionality
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 16.dp)
                     ) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(profilePicUrl ?: "")
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Profile Picture",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        IconButton(
-                            onClick = { /* TODO: Implement profile picture update */ },
+                        Box(
                             modifier = Modifier
-                                .align(Alignment.BottomEnd)
+                                .size(120.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            if (isUploadingImage) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .align(Alignment.Center)
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(profilePicUrl ?: R.drawable.default_profile)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "Profile Picture",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clickable { imagePickerLauncher.launch("image/*") }
+                                )
+                            }
+                        }
+
+                        // Edit button moved outside the profile picture
+                        IconButton(
+                            onClick = { imagePickerLauncher.launch("image/*") },
+                            modifier = Modifier
+                                .padding(start = 16.dp)
+                                .size(48.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primary)
-                                .size(36.dp)
                         ) {
                             Icon(
                                 Icons.Default.Edit,
                                 contentDescription = "Edit Profile Picture",
-                                tint = MaterialTheme.colorScheme.onPrimary
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
@@ -180,9 +244,10 @@ fun ProfileScreen(navController: NavController, userId: String) {
 
                     // Profile Information
                     userData?.let { user ->
+                        android.util.Log.d("Profile", "Displaying user data - Phone: ${user.phoneNumber}")
                         ProfileSection("Name", user.name)
                         ProfileSection("Email", user.email)
-                        ProfileSection("Phone", user.phoneNumber)
+                        ProfileSection("Phone", user.phoneNumber ?: "Not provided")
                         ProfileSection("Role", user.role)
 
                         // Show operator-specific information if role is operator

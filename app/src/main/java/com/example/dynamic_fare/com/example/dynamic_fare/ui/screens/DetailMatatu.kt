@@ -1,29 +1,40 @@
 package com.example.dynamic_fare.ui.screens
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import com.example.dynamic_fare.SetFaresActivity
+import com.example.dynamic_fare.data.FareRepository
+import com.example.dynamic_fare.models.MatatuFares
+import com.google.firebase.storage.FirebaseStorage
+import android.content.ContentValues
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
-import com.google.firebase.database.FirebaseDatabase
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Tab
-import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.font.FontWeight
-import com.example.dynamic_fare.SetFaresActivity
-import com.example.dynamic_fare.data.FareRepository
-import com.example.dynamic_fare.models.MatatuFares
+import com.google.firebase.database.FirebaseDatabase
 
+@OptIn(ExperimentalMaterial3Api::class)
 class FareTabbedActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,7 +78,8 @@ fun FareTabbedScreen(navController: NavController, matatuId: String) {
 @Composable
 fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
     var matatuDetails by remember { mutableStateOf<MatatuDetails?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(matatuId) {
         val database = FirebaseDatabase.getInstance().getReference("matatus")
@@ -75,10 +87,10 @@ fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
             if (snapshot.exists()) {
                 matatuDetails = snapshot.getValue(MatatuDetails::class.java)
             } else {
-                error = "Matatu details not found"
+                Toast.makeText(context, "Matatu details not found", Toast.LENGTH_SHORT).show()
             }
         }.addOnFailureListener { e ->
-            error = "Error loading matatu details: ${e.message}"
+            Toast.makeText(context, "Error loading matatu details: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -98,6 +110,129 @@ fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
         }
 
         matatuDetails?.let { details ->
+            // QR Code Card
+            item {
+                var showQrDialog by remember { mutableStateOf(false) }
+                var isDownloading by remember { mutableStateOf(false) }
+                val context = LocalContext.current
+                val storage = FirebaseStorage.getInstance()
+                var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+                // Load QR code from Firebase Storage using registration number
+                LaunchedEffect(details.registrationNumber) {
+                    val qrRef = storage.reference.child("qr_codes/${details.registrationNumber}.png")
+                    qrRef.getBytes(1024 * 1024) // Max 1MB
+                        .addOnSuccessListener { bytes ->
+                            qrBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(context, "Failed to load QR code: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "QR Code",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Row {
+                                // View QR Code Button
+                                IconButton(onClick = { showQrDialog = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.QrCode2,
+                                        contentDescription = "View QR Code",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                // Download QR Code Button
+                                IconButton(
+                                    onClick = {
+                                        if (qrBitmap != null) {
+                                            isDownloading = true
+                                            val values = ContentValues().apply {
+                                                put(MediaStore.Images.Media.DISPLAY_NAME, "matatu_qr_${details.registrationNumber}.png")
+                                                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                                    put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+                                                }
+                                            }
+
+                                            try {
+                                                context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)?.let { uri ->
+                                                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                                                        qrBitmap?.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                                                        Toast.makeText(context, "QR Code saved to gallery", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Failed to save QR Code: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            } finally {
+                                                isDownloading = false
+                                            }
+                                        }
+                                    },
+                                    enabled = qrBitmap != null && !isDownloading
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = "Download QR Code",
+                                        tint = if (qrBitmap != null && !isDownloading) 
+                                            MaterialTheme.colorScheme.primary 
+                                        else 
+                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // QR Code Dialog
+                if (showQrDialog && qrBitmap != null) {
+                    AlertDialog(
+                        onDismissRequest = { showQrDialog = false },
+                        title = { Text("QR Code") },
+                        text = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    bitmap = qrBitmap!!.asImageBitmap(),
+                                    contentDescription = "QR Code",
+                                    modifier = Modifier
+                                        .size(280.dp)
+                                        .padding(16.dp)
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showQrDialog = false }) {
+                                Text("Close")
+                            }
+                        }
+                    )
+                }
+            }
+
             // Vehicle Information Card
             item {
                 Card(
@@ -244,24 +379,16 @@ fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    if (error != null) {
-                        Text(
-                            text = error!!,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    } else {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Loading matatu details...",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Loading matatu details...",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
         }

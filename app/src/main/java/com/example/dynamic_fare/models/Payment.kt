@@ -12,5 +12,6 @@ data class Payment(
     val matatuRegistration: String = "",
     val mpesaReceiptNumber: String = "",  // Important for verification
     val paymentMethod: String = "",       // e.g., "M-Pesa Till", "M-Pesa Paybill"
-    val phoneNumber: String = ""          // Phone number used for payment
+    val phoneNumber: String = "",         // Phone number used for payment
+    val fleetId: String = ""              // Robust linkage to fleet
 )

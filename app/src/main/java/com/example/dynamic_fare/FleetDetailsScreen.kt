@@ -14,7 +14,7 @@ import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
-
+import com.google.firebase.database.ktx.getValue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,23 +57,39 @@ fun FleetAndFareTabs(navController: NavController, fleetId: String) {
 @Composable
 fun FleetDetailsScreen(navController: NavController, fleetId: String) {
     var fleetName by remember { mutableStateOf("") }
+    var matatuCount by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
 
     val fleetRef = remember { FirebaseDatabase.getInstance().reference.child("fleets").child(fleetId) }
+    val matatuRef = remember { FirebaseDatabase.getInstance().reference.child("matatus") }
 
     LaunchedEffect(fleetId) {
+        // Get fleet details
         fleetRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     fleetName = snapshot.child("fleetName").getValue(String::class.java) ?: ""
                 }
-                isLoading = false
             }
 
             override fun onCancelled(error: DatabaseError) {
-                isLoading = false
+                println("Error fetching fleet details")
             }
         })
+
+        // Count matatus in this fleet by fleetId
+        matatuRef.orderByChild("fleetId").equalTo(fleetId)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    matatuCount = snapshot.childrenCount.toInt()
+                    isLoading = false
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    println("Error counting matatus")
+                    isLoading = false
+                }
+            })
     }
 
     Scaffold(
@@ -88,9 +104,13 @@ fun FleetDetailsScreen(navController: NavController, fleetId: String) {
             if (isLoading) {
                 CircularProgressIndicator()
             } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text("Fleet ID: $fleetId", style = MaterialTheme.typography.bodyLarge)
                     Text("Fleet Name: $fleetName", style = MaterialTheme.typography.bodyMedium)
+                    Text("Number of Matatus: $matatuCount", style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -151,4 +171,3 @@ fun FareDetailsScreen(navController: NavController, fleetId: String) {
         }
     }
 }
-

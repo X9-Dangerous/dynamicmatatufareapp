@@ -10,30 +10,18 @@ import kotlinx.coroutines.withContext
 object FleetRepository {
     private val database = FirebaseDatabase.getInstance().reference.child("fleets")
 
-    // ✅ Register a new fleet with coroutines
+    // Register a new fleet with only fleetId, fleetName, operatorId
     suspend fun registerFleet(
         fleetName: String,
-        mpesaNumber: String,
-        numberOfCars: Int,
-        routeStart: String,
-        routeEnd: String,
-        stops: List<String>,
         operatorId: String
     ): String? = withContext(Dispatchers.IO) {
         return@withContext try {
             val fleetId = database.push().key ?: return@withContext null
-
             val fleetData = mapOf(
                 "fleetId" to fleetId,
                 "fleetName" to fleetName,
-                "mpesaNumber" to mpesaNumber,
-                "numberOfCars" to numberOfCars,
-                "routeStart" to routeStart,
-                "routeEnd" to routeEnd,
-                "stops" to stops,
                 "operatorId" to operatorId
             )
-
             database.child(fleetId).setValue(fleetData).await()
             fleetId
         } catch (e: Exception) {
@@ -42,7 +30,7 @@ object FleetRepository {
         }
     }
 
-    // ✅ Fetch fleets for a given operator with real-time updates
+    // Fetch fleets for a given operator with real-time updates
     fun fetchFleetsForOperator(operatorId: String, onResult: (List<Fleet>) -> Unit) {
         database.orderByChild("operatorId").equalTo(operatorId)
             .addValueEventListener(object : ValueEventListener {
@@ -58,24 +46,7 @@ object FleetRepository {
             })
     }
 
-    // ✅ Add a new fleet
-    suspend fun addFleet(operatorId: String, fleetName: String): Boolean = withContext(Dispatchers.IO) {
-        return@withContext try {
-            val fleetId = database.push().key ?: return@withContext false
-            val fleetData = mapOf(
-                "fleetId" to fleetId,
-                "fleetName" to fleetName,
-                "operatorId" to operatorId
-            )
-            database.child(fleetId).setValue(fleetData).await()
-            true
-        } catch (e: Exception) {
-            Log.e("FleetRepository", "Error adding fleet", e)
-            false
-        }
-    }
-
-    // ✅ Fetch details of a specific fleet with real-time updates
+    // Fetch details of a specific fleet with real-time updates
     fun fetchFleetDetails(fleetId: String, onResult: (Fleet?) -> Unit) {
         database.child(fleetId).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -90,7 +61,7 @@ object FleetRepository {
         })
     }
 
-    // ✅ Delete a fleet
+    // Delete a fleet
     suspend fun deleteFleet(fleetId: String): Boolean = withContext(Dispatchers.IO) {
         return@withContext try {
             val snapshot = database.child(fleetId).get().await()

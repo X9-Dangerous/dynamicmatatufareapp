@@ -12,7 +12,7 @@ object MatatuRepository {
         return regex.matches(plate)
     }
 
-    // ✅ Register a new matatu (without storing QR Code)
+    // Register a new matatu (without storing QR Code)
     fun registerMatatu(
         matatuId: String,
         operatorId: String,
@@ -26,6 +26,7 @@ object MatatuRepository {
         accountNumber: String,
         tillNumber: String,
         sendMoneyPhone: String,
+        fleetId: String = "",  // Optional fleetId parameter with empty default
         onComplete: (Boolean) -> Unit
     ) {
         // Check if registration number already exists
@@ -49,7 +50,8 @@ object MatatuRepository {
                             "paybillNumber" to paybillNumber,
                             "accountNumber" to accountNumber,
                             "tillNumber" to tillNumber,
-                            "sendMoneyPhone" to sendMoneyPhone
+                            "sendMoneyPhone" to sendMoneyPhone,
+                            "fleetId" to fleetId
                         )
 
                         database.child(matatuId).setValue(matatuData)
@@ -64,13 +66,13 @@ object MatatuRepository {
                 }
 
                 override fun onCancelled(error: DatabaseError) {
-                    Log.e("MatatuRepository", "Error checking registration number: \${error.message}")
+                    Log.e("MatatuRepository", "Error checking registration number: ${error.message}")
                     onComplete(false)
                 }
             })
     }
 
-    // ✅ Fetch all matatus under a specific operator (Real-Time Updates)
+    // Fetch all matatus under a specific operator (Real-Time Updates)
     fun fetchMatatusForOperator(operatorId: String, onResult: (List<Matatu>) -> Unit) {
         database.orderByChild("operatorId").equalTo(operatorId)
             .addValueEventListener(object : ValueEventListener {
@@ -80,13 +82,13 @@ object MatatuRepository {
                 }
 
                 override fun onCancelled(error: DatabaseError) {
-                    Log.e("MatatuRepository", "Error fetching matatus: \${error.message}")
+                    Log.e("MatatuRepository", "Error fetching matatus: ${error.message}")
                     onResult(emptyList())
                 }
             })
     }
 
-    // ✅ Fetch a single matatu's details (Real-Time Updates)
+    // Fetch a single matatu's details (Real-Time Updates)
     fun fetchMatatuDetails(matatuId: String, onResult: (Matatu?) -> Unit) {
         database.child(matatuId)
             .addValueEventListener(object : ValueEventListener {
@@ -96,21 +98,24 @@ object MatatuRepository {
                 }
 
                 override fun onCancelled(error: DatabaseError) {
-                    Log.e("MatatuRepository", "Error fetching matatu details: \${error.message}")
+                    Log.e("MatatuRepository", "Error fetching matatu details: ${error.message}")
                     onResult(null)
                 }
             })
     }
 
-    // ✅ Delete a matatu and its associated fare details
+    // Delete a matatu and its associated fare details
     fun deleteMatatu(matatuId: String, onComplete: (Boolean) -> Unit) {
+        if (matatuId.isBlank()) {
+            Log.e("MatatuRepository", "Attempted to delete matatu with empty matatuId!")
+            onComplete(false)
+            return
+        }
         Log.d("MatatuRepository", "Starting deletion process for matatuId: $matatuId")
-        
         // Delete matatu details
         database.child(matatuId).removeValue()
             .addOnSuccessListener {
                 Log.d("MatatuRepository", "Successfully deleted matatu: $matatuId")
-                
                 // Also delete associated fare details
                 val faresRef = FirebaseDatabase.getInstance().reference.child("fares")
                 faresRef.child(matatuId).removeValue()
@@ -129,7 +134,7 @@ object MatatuRepository {
             }
     }
 
-    // ✅ Get matatuId by registration number
+    // Get matatuId by registration number
     fun getMatatuIdByRegistration(registrationNumber: String, onResult: (String?) -> Unit) {
         database.orderByChild("registrationNumber").equalTo(registrationNumber)
             .addListenerForSingleValueEvent(object : ValueEventListener {

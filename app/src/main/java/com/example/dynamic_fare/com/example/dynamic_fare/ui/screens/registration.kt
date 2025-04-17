@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.dynamic_fare.data.MatatuRepository
+import com.example.dynamic_fare.data.FleetRepository
+import com.example.dynamic_fare.models.Fleet
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
@@ -51,6 +53,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.example.dynamic_fare.Routes
 import androidx.compose.foundation.layout.statusBarsPadding
+import com.google.firebase.storage.FirebaseStorage
+import java.io.ByteArrayOutputStream
+import com.google.firebase.database.FirebaseDatabase
 
 // Data class to hold GTFS stop suggestion
 data class GtfsStopSuggestion(
@@ -254,39 +259,99 @@ fun GtfsInputField(
     }
 }
 
-fun saveQRCodeToStorage(context: Context, bitmap: Bitmap) {
-    val filename = "matatu_qr_${System.currentTimeMillis()}.png"
-    val contentValues = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, filename)
-        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/QR_Codes")
-    }
-
-    val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-    uri?.let {
-        context.contentResolver.openOutputStream(it)?.use { outputStream ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-            Toast.makeText(context, "QR Code saved to gallery!", Toast.LENGTH_LONG).show()
-        } ?: Toast.makeText(context, "Error saving QR code!", Toast.LENGTH_LONG).show()
-    } ?: Toast.makeText(context, "Error saving QR code!", Toast.LENGTH_LONG).show()
-}
-
-
 @Composable
 fun RegistrationScreen(navController: NavController, operatorId: String) {
     var regNumber by remember { mutableStateOf("") }
     var routeStart by remember { mutableStateOf("") }
     var routeEnd by remember { mutableStateOf("") }
     var stops by remember { mutableStateOf(mutableListOf<String>()) }
-    var showMpesaPage by remember { mutableStateOf(false) }
+    var currentStop by remember { mutableStateOf("") }
     var mpesaType by remember { mutableStateOf("") }
     var pochiNumber by remember { mutableStateOf("") }
-    var tillNumber by remember { mutableStateOf("") }
     var paybillNumber by remember { mutableStateOf("") }
     var accountNumber by remember { mutableStateOf("") }
+    var tillNumber by remember { mutableStateOf("") }
     var sendMoneyPhone by remember { mutableStateOf("") }
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var fleets by remember { mutableStateOf<List<Fleet>>(emptyList()) }
+    var selectedFleet by remember { mutableStateOf<Fleet?>(null) }
+    var showFleetDialog by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(true) }
+    var showMpesaPage by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // Permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Toast.makeText(context, "Storage permission granted", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Storage permission denied", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Function to check and request storage permission
+    fun checkAndRequestStoragePermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            true // Android 10 and above don't need storage permission for saving to gallery
+        } else {
+            when {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    true
+                }
+                else -> {
+                    permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    false
+                }
+            }
+        }
+    }
+
+    // Function to save QR code to gallery
+    fun saveQRCodeToGallery(qrBitmap: Bitmap, registrationNumber: String): Boolean {
+        if (!checkAndRequestStoragePermission()) {
+            return false
+        }
+
+        try {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "matatu_qr_${registrationNumber}.png")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+                }
+            }
+
+            context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)?.let { uri ->
+                context.contentResolver.openOutputStream(uri)?.use { stream ->
+                    qrBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                    Toast.makeText(context, "QR Code saved to gallery", Toast.LENGTH_SHORT).show()
+                    return true
+                }
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "Failed to save QR Code to gallery: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+        return false
+    }
+
+    // Fetch fleets for this operator
+    LaunchedEffect(operatorId) {
+        FleetRepository.fetchFleetsForOperator(operatorId) { fetchedFleets ->
+            fleets = fetchedFleets
+            isLoading = false
+            if (fleets.isNotEmpty()) {
+                showFleetDialog = true
+            }
+        }
+    }
 
     // GTFS suggestion states
     var startingSuggestions by remember { mutableStateOf<List<GtfsStopSuggestion>>(emptyList()) }
@@ -297,10 +362,6 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
     // Coordinates for start and end points from GTFS data
     var startLocationCoordinates by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var endLocationCoordinates by remember { mutableStateOf<Pair<Double, Double>?>(null) }
-
-    val context = LocalContext.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val coroutineScope = rememberCoroutineScope()
 
     // Load initial GTFS data when the screen is first shown
     LaunchedEffect(Unit) {
@@ -335,17 +396,6 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
         }
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            if (isGranted) {
-                qrBitmap?.let { bitmap -> saveQRCodeToStorage(context, bitmap) }
-            } else {
-                Toast.makeText(context, "Permission denied! Unable to save QR code.", Toast.LENGTH_LONG).show()
-            }
-        }
-    )
-
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(20.dp)) {
         if (!showMpesaPage) {
             Text("Matatu Registration", style = MaterialTheme.typography.headlineMedium)
@@ -370,7 +420,6 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
                 onSuggestionSelected = { suggestion ->
                     routeStart = suggestion.stopName
                     startLocationCoordinates = Pair(suggestion.latitude, suggestion.longitude)
-                    keyboardController?.hide()
                     Log.d("GTFS", "Selected start suggestion: ${suggestion.stopName} at ${suggestion.latitude},${suggestion.longitude}")
                 },
                 label = "Route Start",
@@ -391,7 +440,6 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
                 onSuggestionSelected = { suggestion ->
                     routeEnd = suggestion.stopName
                     endLocationCoordinates = Pair(suggestion.latitude, suggestion.longitude)
-                    keyboardController?.hide()
                     Log.d("GTFS", "Selected end suggestion: ${suggestion.stopName} at ${suggestion.latitude},${suggestion.longitude}")
                 },
                 label = "Route End",
@@ -475,59 +523,16 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
 
             Button(onClick = {
                 coroutineScope.launch {
-                    try {
-                        // Add coordinates to QR data if available
-                        val startCoords = if (startLocationCoordinates != null)
-                            "${startLocationCoordinates?.first},${startLocationCoordinates?.second}"
-                        else ""
-                        val endCoords = if (endLocationCoordinates != null)
-                            "${endLocationCoordinates?.first},${endLocationCoordinates?.second}"
-                        else ""
-                        val qrData = "$regNumber"
-                        val bitMatrix: BitMatrix = MultiFormatWriter().encode(qrData, BarcodeFormat.QR_CODE, 500, 500)
-                        val barcodeEncoder = BarcodeEncoder()
-                        qrBitmap = barcodeEncoder.createBitmap(bitMatrix)
-
-                        // Save QR Code
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            saveQRCodeToStorage(context, qrBitmap!!)
-                        } else {
-                            val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
-                            if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
-                                saveQRCodeToStorage(context, qrBitmap!!)
-                            } else {
-                                permissionLauncher.launch(permission)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Error generating QR code: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
-                }
-            }) {
-                Text("Generate & Save QR Code")
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-// Display QR Code if generated
-            qrBitmap?.let { bitmap ->
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Generated QR Code",
-                    modifier = Modifier
-                        .size(200.dp)
-                        .padding(10.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Button(onClick = {
-                coroutineScope.launch {
                     val stopsCopy = stops.toList()
-                    // Store only the parameters that exist in MatatuRepository
+                    var registeredMatatuId = ""
+                    
+                    // First get a new matatu ID
+                    val database = FirebaseDatabase.getInstance()
+                    val matatuRef = database.getReference("matatus").push()
+                    registeredMatatuId = matatuRef.key ?: return@launch
+                    
                     MatatuRepository.registerMatatu(
-                        matatuId = "",
+                        matatuId = registeredMatatuId,
                         operatorId = operatorId,
                         regNumber = regNumber,
                         routeStart = routeStart,
@@ -538,13 +543,50 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
                         paybillNumber = paybillNumber,
                         accountNumber = accountNumber,
                         tillNumber = tillNumber,
-                        sendMoneyPhone = sendMoneyPhone
+                        sendMoneyPhone = sendMoneyPhone,
+                        fleetId = selectedFleet?.fleetId ?: ""
                     ) { success ->
                         if (success) {
-                            Toast.makeText(context, "Matatu Registered Successfully!", Toast.LENGTH_LONG).show()
-                            navController.navigate(Routes.operatorHomeRoute(operatorId)) {
-                                // Clear the back stack up to the operator home
-                                popUpTo(Routes.OperatorHome) { inclusive = true }
+                            // Generate and save QR code
+                            try {
+                                val multiFormatWriter = MultiFormatWriter()
+                                val bitMatrix: BitMatrix = multiFormatWriter.encode(
+                                    registeredMatatuId,
+                                    BarcodeFormat.QR_CODE,
+                                    500,
+                                    500
+                                )
+                                val barcodeEncoder = BarcodeEncoder()
+                                val qrBitmap = barcodeEncoder.createBitmap(bitMatrix)
+
+                                // Save QR code to gallery
+                                saveQRCodeToGallery(qrBitmap, registeredMatatuId)
+
+                                // Upload QR code to Firebase Storage
+                                val storage = FirebaseStorage.getInstance()
+                                val qrRef = storage.reference.child("qr_codes/${regNumber}.png")
+                                val baos = ByteArrayOutputStream()
+                                qrBitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                                val data = baos.toByteArray()
+
+                                qrRef.putBytes(data)
+                                    .addOnSuccessListener {
+                                        Toast.makeText(context, "Registration Successful!", Toast.LENGTH_LONG).show()
+                                        navController.navigate(Routes.operatorHomeRoute(operatorId)) {
+                                            popUpTo(Routes.OperatorHome) { inclusive = true }
+                                        }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Toast.makeText(context, "Registration successful but failed to save QR code: ${e.message}", Toast.LENGTH_LONG).show()
+                                        navController.navigate(Routes.operatorHomeRoute(operatorId)) {
+                                            popUpTo(Routes.OperatorHome) { inclusive = true }
+                                        }
+                                    }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Registration successful but failed to generate QR code: ${e.message}", Toast.LENGTH_LONG).show()
+                                navController.navigate(Routes.operatorHomeRoute(operatorId)) {
+                                    popUpTo(Routes.OperatorHome) { inclusive = true }
+                                }
                             }
                         } else {
                             Toast.makeText(context, "Registration Failed!", Toast.LENGTH_LONG).show()
@@ -553,6 +595,69 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
                 }
             }) {
                 Text("Register Matatu")
+            }
+
+            // Show selected fleet info if any
+            selectedFleet?.let { fleet ->
+                Text(
+                    text = "Selected Fleet: ${fleet.fleetName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                Button(
+                    onClick = { showFleetDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Change Fleet")
+                }
+            }
+
+            // Fleet selection dialog
+            if (showFleetDialog) {
+                AlertDialog(
+                    onDismissRequest = { showFleetDialog = false },
+                    title = { Text("Select Fleet") },
+                    text = {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Column {
+                                fleets.forEach { fleet ->
+                                    Button(
+                                        onClick = {
+                                            selectedFleet = fleet
+                                            showFleetDialog = false
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp)
+                                    ) {
+                                        Text(fleet.fleetName)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        selectedFleet = null
+                                        showFleetDialog = false
+                                        navController.navigate(Routes.RegistrationScreen.replace("{operatorId}", operatorId))
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Register Without Fleet")
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {},
+                    dismissButton = {
+                        TextButton(onClick = { showFleetDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
             }
         }
     }

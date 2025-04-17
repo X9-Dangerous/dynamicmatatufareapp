@@ -12,11 +12,8 @@ val pochiNumber: String = "",
 val paybillNumber: String = "",
 val accountNumber: String = "",
 val tillNumber: String = "",
-val sendMoneyPhone: String = ""
-
-
-
-
+val sendMoneyPhone: String = "",
+val fleetname: String = ""  // Optional fleetname parameter with empty default
 ) {
 
 }

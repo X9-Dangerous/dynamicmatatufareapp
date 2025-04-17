@@ -18,6 +18,7 @@ import androidx.navigation.NavController
 import com.google.firebase.database.FirebaseDatabase
 import com.example.dynamic_fare.models.MatatuFares
 import com.example.dynamic_fare.models.Payment
+import com.example.dynamic_fare.data.FleetRepository
 
 @Composable
 fun PaymentPage(
@@ -41,15 +42,16 @@ fun PaymentPage(
     var isPhoneLoaded by remember { mutableStateOf(false) }
     var isDisabled by remember { mutableStateOf(false) }
     var originalFare by remember { mutableStateOf<String?>(null) }
-    
+    var fleetName by remember { mutableStateOf<String?>(null) }
+
     // New state for success dialog
     var showSuccessDialog by remember { mutableStateOf(false) }
     var successMessage by remember { mutableStateOf("") }
     var successAmount by remember { mutableStateOf("") }
-    
+
     // Use the provided userId parameter
     android.util.Log.d("Payment", "Using userId: $userId")
-    
+
     // Fetch user's phone number and accessibility settings
     LaunchedEffect(userId) {
         // Check accessibility settings
@@ -86,6 +88,35 @@ fun PaymentPage(
         }
     }
 
+    // Fetch matatu details and fleet information
+    LaunchedEffect(scannedQRCode) {
+        android.util.Log.d("Payment", "Starting matatu and fleet info fetch for matatuId: $scannedQRCode")
+        val matatuRef = FirebaseDatabase.getInstance().getReference("matatus").child(scannedQRCode)
+        matatuRef.get().addOnSuccessListener { snapshot ->
+            android.util.Log.d("Payment", "Matatu snapshot exists: ${snapshot.exists()}")
+            if (snapshot.exists()) {
+                val matatu = snapshot.getValue(Matatu::class.java)
+                android.util.Log.d("Payment", "Found matatu: ${matatu?.registrationNumber}, fleetId: ${matatu?.fleetId}")
+                registrationNumber = matatu?.registrationNumber
+                
+                // If matatu belongs to a fleet, fetch fleet name
+                if (!matatu?.fleetId.isNullOrEmpty()) {
+                    android.util.Log.d("Payment", "Matatu belongs to fleet. Fetching fleet details for fleetId: ${matatu!!.fleetId}")
+                    FleetRepository.fetchFleetDetails(matatu.fleetId) { fleet ->
+                        android.util.Log.d("Payment", "Fleet details fetched: ${fleet?.fleetName ?: "null"}")
+                        fleetName = fleet?.fleetName
+                    }
+                } else {
+                    android.util.Log.d("Payment", "Matatu does not belong to any fleet (fleetId is null or empty)")
+                }
+            } else {
+                android.util.Log.e("Payment", "No matatu found with matatuId: $scannedQRCode")
+            }
+        }.addOnFailureListener { e ->
+            android.util.Log.e("Payment", "Error fetching matatu details: ${e.message}")
+        }
+    }
+
     // Fetch all required data in parallel
     LaunchedEffect(scannedQRCode) {
         // Start weather fetch with timeout
@@ -98,7 +129,7 @@ fun PaymentPage(
                 android.util.Log.d("Payment", "Weather fetch timed out")
             }
         }
-        
+
         // Set 2-second timeout for weather fetch
         weatherTimeout.postDelayed(weatherTimeoutRunnable, 2000)
 
@@ -108,7 +139,7 @@ fun PaymentPage(
             if (snapshot.exists()) {
                 registrationNumber = snapshot.child("registrationNumber").value?.toString()
                 mpesaOption = snapshot.child("mpesaOption").value?.toString()
-                
+
                 // Get M-Pesa details based on the option
                 android.util.Log.d("Payment", "Raw mpesaOption: $mpesaOption")
                 when (mpesaOption?.lowercase()) {
@@ -138,13 +169,13 @@ fun PaymentPage(
                         )
                     }
                 }
-                
+
                 android.util.Log.d("Payment", "M-Pesa Option: $mpesaOption, Details: $mpesaDetails")
-                
+
                 // Get city and fetch weather
                 val city = snapshot.child("routeStart").value?.toString()?.split(",")?.lastOrNull()?.trim() ?: "Nairobi"
                 android.util.Log.d("Payment", "Fetching weather for city: $city")
-                
+
                 weatherManager.fetchWeather { raining ->
                     if (!weatherFetched) {  // Only update if we haven't timed out
                         isRaining = raining
@@ -153,7 +184,7 @@ fun PaymentPage(
                         android.util.Log.d("Payment", "Weather status for $city - isRaining: $raining")
                     }
                 }
-                
+
                 // Start fare fetch immediately after getting matatu details
                 fareManager.fetchFares(scannedQRCode) { fares ->
                     if (fares != null) {
@@ -167,12 +198,12 @@ fun PaymentPage(
                                     // Get the matatu ID first
                                     val matatuId = snapshot.key
                                     android.util.Log.d("Payment", "Matatu ID: $matatuId")
-                                    
+
                                     // Get fares from the correct path
                                     val faresRef = FirebaseDatabase.getInstance().getReference("fares/$matatuId")
                                     faresRef.get().addOnSuccessListener { faresSnapshot ->
                                         android.util.Log.d("Payment", "Fares data: ${faresSnapshot.value}")
-                                        
+
                                         // Convert snapshot to MatatuFares object
                                         val fareData = faresSnapshot.value as? Map<*, *>
                                         val matatuFares = MatatuFares(
@@ -183,20 +214,20 @@ fun PaymentPage(
                                             rainyNonPeakFare = (fareData?.get("rainyNonPeakFare") as? Number)?.toDouble() ?: 0.0,
                                             disabilityDiscount = (fareData?.get("disabilityDiscount") as? Number)?.toDouble() ?: 0.0
                                         )
-                                        
+
                                         android.util.Log.d("Payment", "Disability discount from fares: ${matatuFares.disabilityDiscount}%")
-                                        
+
                                         // Then calculate the fare using the fetched fares data
                                         val (baseFare, breakdown) = fareManager.getFare(matatuFares, isPeakHours, isRaining, isDisabled, false)
-                                        
+
                                         // Store original and final fares
                                         originalFare = baseFare.toInt().toString()
                                         fare = baseFare.toInt().toString()
                                         android.util.Log.d("Payment", "Original fare: $originalFare, Final fare: $fare")
-                                        
+
                                         // Use the breakdown directly since getFare() now includes the disability discount info
                                         val finalBreakdown = breakdown
-                                        
+
                                         paymentStatus = finalBreakdown
                                         android.util.Log.d("Payment", "Original fare: $originalFare, Final fare (after disability check): $fare")
                                         isLoading = false
@@ -311,7 +342,16 @@ fun PaymentPage(
             )
         } else {
             // Payment Details
+            Text(
+                text = "Payment Details",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
             PaymentDetailRow("Matatu Registration", registrationNumber!!)
+            if (!fleetName.isNullOrEmpty()) {
+                PaymentDetailRow("Fleet", fleetName!!)
+            }
             Spacer(modifier = Modifier.height(20.dp))
             PaymentDetailRow("Fare", "KES $fare")
             Spacer(modifier = Modifier.height(20.dp))
@@ -364,7 +404,7 @@ fun PaymentPage(
                     // Convert fare string to integer, removing any non-numeric characters
                     val fareString = fare?.replace(Regex("[^0-9]"), "") ?: "0"
                     val validFare = fareString.toIntOrNull() ?: 0
-                    
+
                     android.util.Log.d("Payment", "Initiating payment with amount: $validFare")
                     if (validFare <= 0) {
                         isLoading = false
@@ -398,7 +438,7 @@ fun PaymentPage(
                             // Save payment to history
                             val database = FirebaseDatabase.getInstance().getReference("payments")
                             val paymentId = database.push().key ?: return@initiatePayment
-                            
+
                             val payment = Payment(
                                 id = paymentId,
                                 userId = userId,
@@ -446,22 +486,22 @@ fun PaymentPage(
 private fun formatPhoneNumber(phone: String): String {
     // Remove any non-digit characters
     val digitsOnly = phone.replace(Regex("[^0-9]"), "")
-    
+
     // If it starts with 254, use as is
     if (digitsOnly.startsWith("254")) {
         return digitsOnly
     }
-    
+
     // If it starts with 0, replace with 254
     if (digitsOnly.startsWith("0")) {
         return "254${digitsOnly.substring(1)}"
     }
-    
+
     // If it's just 9 digits (without country code), add 254
     if (digitsOnly.length == 9) {
         return "254$digitsOnly"
     }
-    
+
     // Return original digits if none of the above match
     return digitsOnly
 }
