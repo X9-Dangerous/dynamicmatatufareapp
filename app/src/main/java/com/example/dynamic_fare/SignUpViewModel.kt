@@ -1,16 +1,14 @@
 package com.example.dynamic_fare
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DatabaseReference
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class SignUpViewModel(
-    private val auth: FirebaseAuth,
-    private val db: DatabaseReference
+    private val context: Context
 ) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
@@ -48,7 +46,17 @@ class SignUpViewModel(
         _isLoading.value = true
 
         viewModelScope.launch {
-            val success = AuthManager.signUpUser(auth, db, name, surname, phone, email, password, confirmPassword, selectedRole, termsAccepted)
+            val success = AuthManager.signUpUser(
+                context,
+                name,
+                surname,
+                phone,
+                email,
+                password,
+                confirmPassword,
+                selectedRole,
+                termsAccepted
+            )
             _isLoading.value = false
 
             if (success) {

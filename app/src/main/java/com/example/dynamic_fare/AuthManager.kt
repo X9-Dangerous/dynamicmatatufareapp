@@ -1,13 +1,12 @@
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DatabaseReference
+import android.content.Context
+import com.example.dynamic_fare.auth.SqliteUserRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 object AuthManager {
     suspend fun signUpUser(
-        auth: FirebaseAuth,
-        db: DatabaseReference,
+        context: Context,
         name: String,
         surname: String,
         phone: String,
@@ -31,32 +30,14 @@ object AuthManager {
 
         return withContext(Dispatchers.IO) {
             try {
-                val result = auth.createUserWithEmailAndPassword(email, password).await()
-                val user = result.user
-                user?.let {
-                    val userData = mutableMapOf(
-                        "name" to name,
-                        "surname" to surname,
-                        "phone" to phone,
-                        "email" to email,
-                        "role" to selectedRole
-                    )
-
-                    // If the user is a Matatu Operator, generate an operatorId
-                    if (selectedRole == "Matatu Operator") {
-                        val operatorId = db.child("operators").push().key // Generate unique ID
-
-                        // Ensure operatorId is not null before using it
-                        if (!operatorId.isNullOrEmpty()) {
-                            userData["operatorId"] = operatorId
-                            db.child("operators").child(operatorId).setValue(mapOf("userId" to it.uid))
-                        }
-                    }
-
-                    db.child("users").child(it.uid).setValue(userData).await()
-                }
+                val userRepository = SqliteUserRepository(context)
+                val fullName = "$name $surname"
+                android.util.Log.d("AuthManager", "Registering user: $fullName, Email: $email, Phone: $phone, Role: $selectedRole")
+                val result = userRepository.registerUser(fullName, email, password, phone, selectedRole)
+                android.util.Log.d("AuthManager", "Registration result: $result")
                 true
             } catch (e: Exception) {
+                android.util.Log.e("AuthManager", "Registration failed: ${e.message}")
                 false
             }
         }

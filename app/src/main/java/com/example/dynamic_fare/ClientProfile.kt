@@ -33,15 +33,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.dynamic_fare.R
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.ValueEventListener
-import com.google.firebase.storage.FirebaseStorage
-import android.util.Log
-import android.widget.Toast
-
+import com.example.dynamic_fare.auth.SqliteUserRepository
 
 class ProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,283 +54,72 @@ class ProfileActivity : ComponentActivity() {
 }
 
 @Composable
-fun ClientProfileScreen(navController: NavController) {
-    // State variables for user data
-    var username by remember { mutableStateOf("Loading...") }
-    var email by remember { mutableStateOf("") }
-    var phoneNumber by remember { mutableStateOf("") }
-    var profilePicUrl by remember { mutableStateOf("") }
+fun ClientProfileScreen(navController: NavController, userId: String) {
+    val context = LocalContext.current
+    val userRepository = remember { SqliteUserRepository(context) }
+    val userEmail = userId
+
+    var userData by remember { mutableStateOf<com.example.dynamic_fare.auth.User?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isUploadingImage by remember { mutableStateOf(false) }
 
-    // Firebase references
-    val auth = FirebaseAuth.getInstance()
-    val database = FirebaseDatabase.getInstance()
-    val storage = FirebaseStorage.getInstance()
-    val currentUser = auth.currentUser
-    val userId = currentUser?.uid
-
-    val context = LocalContext.current
-
-    // Cleanup function for Firebase listeners
-    val valueEventListener = remember { mutableStateOf<ValueEventListener?>(null) }
-
-    // Cleanup when leaving the screen
-    DisposableEffect(Unit) {
-        onDispose {
-            // Remove the database listener
-            valueEventListener.value?.let { listener ->
-                userId?.let { uid ->
-                    database.getReference("users/$uid").removeEventListener(listener)
-                }
+    LaunchedEffect(userEmail) {
+        if (userEmail != null) {
+            val user = userRepository.getUserByEmail(userEmail)
+            if (user != null) {
+                userData = user
+                isLoading = false
+            } else {
+                errorMessage = "User not found in local database."
+                isLoading = false
             }
-        }
-    }
-
-    // Image picker launcher
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null && userId != null) {
-            isUploadingImage = true
-
-            // Reference to Firebase Storage
-            val storageRef = storage.reference
-            val imageRef = storageRef.child("profile_images/$userId.jpg")
-
-            imageRef.putFile(uri)
-                .addOnSuccessListener { taskSnapshot ->
-                    // Get the download URL
-                    imageRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                        // Update the profile URL in the database
-                        val userRef = database.getReference("users/$userId")
-                        userRef.child("profilePicUrl").setValue(downloadUri.toString())
-                            .addOnSuccessListener {
-                                profilePicUrl = downloadUri.toString()
-                                Toast.makeText(context, "Profile picture updated successfully", Toast.LENGTH_SHORT).show()
-                            }
-                            .addOnFailureListener { e ->
-                                Toast.makeText(context, "Failed to update profile URL: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                    }
-                }
-                .addOnFailureListener { e ->
-                    Toast.makeText(context, "Failed to upload image: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-                .addOnCompleteListener {
-                    isUploadingImage = false
-                }
-        }
-    }
-
-    // Fetch user data
-    LaunchedEffect(userId) {
-        if (userId != null) {
-            val userRef = database.getReference("users/$userId")
-            val listener = object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    if (snapshot.exists()) {
-                        username = snapshot.child("name").getValue(String::class.java) ?: "Unknown"
-                        email = snapshot.child("email").getValue(String::class.java) ?: ""
-                        phoneNumber = snapshot.child("phone").getValue(String::class.java) ?: ""
-                        profilePicUrl = snapshot.child("profilePicUrl").getValue(String::class.java) ?: ""
-                        isLoading = false
-                    }
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    errorMessage = "Failed to load profile: ${error.message}"
-                    isLoading = false
-                }
-            }
-            
-            // Store the listener reference for cleanup
-            valueEventListener.value = listener
-            userRef.addValueEventListener(listener)
-        }
-    }
-
-    // Function to handle logout with proper cleanup
-    val onLogout: () -> Unit = {
-        // Remove the database listener
-        valueEventListener.value?.let { listener ->
-            userId?.let { uid ->
-                database.getReference("users/$uid").removeEventListener(listener)
-            }
-        }
-        
-        // Sign out from Firebase
-        auth.signOut()
-        
-        // Navigate to login and clear the back stack
-        navController.navigate("login") {
-            popUpTo(0) { inclusive = true }
+        } else {
+            errorMessage = "No user logged in."
+            isLoading = false
         }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.systemBars)
-            .background(Color.White)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Profile Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Profile Picture with loading state
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray)
-                    .clickable { imagePickerLauncher.launch("image/*") }
-            ) {
-                if (isUploadingImage) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .align(Alignment.Center)
-                    )
-                } else {
-                    Image(
-                        painter = if (profilePicUrl.isNotEmpty()) {
-                            rememberAsyncImagePainter(profilePicUrl) // Load from URL
-                        } else {
-                            painterResource(id = R.drawable.ic_acccount) // Default profile image
-                        },
-                        contentDescription = "Profile Picture",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Username and Edit Icon
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = username,
-                    fontSize = 20.sp,
-                    color = Color.Black
-                )
-
-                IconButton(
-                    onClick = { imagePickerLauncher.launch("image/*") },
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit profile picture",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
+        Spacer(modifier = Modifier.height(32.dp))
+        Text("Client Profile", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Contact Information
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Contact Information",
-                    fontSize = 18.sp,
-                    color = Color.DarkGray,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_alerts), // Replace with email icon
-                        contentDescription = "Email",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = email,
-                        fontSize = 16.sp,
-                        color = Color.Black
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_phone), // Replace with phone icon
-                        contentDescription = "Phone",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = phoneNumber.ifEmpty { "No phone number" },
-                        fontSize = 16.sp,
-                        color = Color.Black
-                    )
-                }
-            }
-        }
-
-        // Show any error messages
-        errorMessage?.let {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = it,
-                color = Color.Red,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-
-        // Show loading indicator if needed
         if (isLoading) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Loading...", color = Color.Gray)
+            CircularProgressIndicator()
+        } else if (errorMessage != null) {
+            Text(errorMessage!!, color = Color.Red)
+        } else if (userData != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Name: ${userData!!.name}", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Phone: ${userData!!.phone}", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Email: ${userData!!.email}", fontSize = 16.sp)
+                }
             }
         }
-
-        Spacer(modifier = Modifier.height(100.dp))
-
-        // Logout Button
+        Spacer(modifier = Modifier.weight(1f))
         Button(
-            onClick = onLogout,
+            onClick = {
+                navController.navigate("login") {
+                    popUpTo("clientHome") { inclusive = true }
+                }
+            },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 24.dp)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(vertical = 8.dp),
         ) {
             Text(text = "Logout", color = Color.White)
         }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Footer
-        FooterWithIcons(navController)
     }
 }

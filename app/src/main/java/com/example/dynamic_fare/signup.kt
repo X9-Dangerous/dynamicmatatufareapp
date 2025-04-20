@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
 
 @Composable
@@ -103,23 +105,21 @@ fun SignUpScreen(navController: NavController, viewModel: SignUpViewModel) {
             }
 
             item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Select Role", style = MaterialTheme.typography.bodyMedium)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Text("Select Role", fontWeight = FontWeight.Bold)
+                Row(modifier = Modifier.fillMaxWidth()) {
                     RadioButton(
                         selected = uiState.selectedRole == "Matatu Operator",
                         onClick = { uiState.selectedRole = "Matatu Operator" }
                     )
-                    Text("Matatu Operator")
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Matatu Operator", modifier = Modifier.padding(end = 16.dp))
                     RadioButton(
                         selected = uiState.selectedRole == "Matatu Client",
                         onClick = { uiState.selectedRole = "Matatu Client" }
                     )
                     Text("Matatu Client")
+                }
+                if (uiState.selectedRole.isBlank()) {
+                    Text("Please select a role to continue.", color = Color.Red, fontSize = 12.sp)
                 }
             }
 

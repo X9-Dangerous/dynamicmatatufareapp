@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
             Log.e("MainActivity", "Error initializing database: ${e.message}", e)
         }
 
-        val signUpViewModel = ViewModelProvider(this, SignUpViewModelFactory(auth, db)).get(SignUpViewModel::class.java)
+        val signUpViewModel = ViewModelProvider(this, SignUpViewModelFactory(applicationContext)).get(SignUpViewModel::class.java)
 
         setContent {
             DynamicMatauFareAppTheme {
@@ -224,7 +224,7 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("userId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val userId = backStackEntry.arguments?.getString("userId") ?: ""
-                        ClientProfileScreen(navController = navController)
+                        ClientProfileScreen(navController = navController, userId = userId)
                     }
                 }
             }

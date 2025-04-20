@@ -47,6 +47,7 @@ fun FooterWithIcons(
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
+                        Log.d("FooterWithIcons", "Navigating to home with userId: $userId")
                         navController.navigate(Routes.homeRoute(userId)) {
                             popUpTo(Routes.HomeScreen) { inclusive = true }
                             launchSingleTop = true
@@ -63,6 +64,7 @@ fun FooterWithIcons(
                         // Get current user ID from Firebase Auth
                         val userId = FirebaseAuth.getInstance().currentUser?.uid
                         if (userId != null) {
+                            Log.d("FooterWithIcons", "Navigating to notifications with userId: $userId")
                             navController.navigate(Routes.notificationsRoute(userId)) {
                                 launchSingleTop = true
                             }
@@ -76,7 +78,7 @@ fun FooterWithIcons(
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
-                        Log.d("Footer", "Navigating to client profile with userId: $userId")
+                        Log.d("FooterWithIcons", "Navigating to client profile with userId: $userId")
                         navController.navigate(Routes.clientProfileRoute(userId)) {
                             launchSingleTop = true
                         }
@@ -112,7 +114,7 @@ fun FooterWithIcons(
                                                 .child(currentUserId)
                                                 .setValue(initialSettings)
                                         }
-                                        // Navigate to settings
+                                        Log.d("FooterWithIcons", "Navigating to accessibility settings with userId: $currentUserId")
                                         navController.navigate(Routes.accessibilitySettingsRoute(currentUserId)) {
                                             launchSingleTop = true
                                         }
@@ -131,4 +133,3 @@ fun FooterWithIcons(
         }
     }
 }
-

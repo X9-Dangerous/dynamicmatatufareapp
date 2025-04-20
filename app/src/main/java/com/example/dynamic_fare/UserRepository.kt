@@ -1,9 +1,9 @@
 package com.example.dynamic_fare.auth
 
+import android.content.Context
 import android.util.Log
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 data class UserData(
     val name: String = "",
@@ -19,24 +19,17 @@ data class OperatorData(
     val licenseNumber: String = ""
 )
 
-class UserRepository {
-    private val database = FirebaseDatabase.getInstance().getReference("users")
-    private val firestore = FirebaseFirestore.getInstance()
+class UserRepository(private val context: Context) {
+    private val sqliteUserRepository = SqliteUserRepository(context)
 
-    suspend fun fetchUserRole(uid: String): String? {
-        return try {
-            val snapshot = database
-                .child(uid)
-                .child("role")
-                .get()
-                .await()
-
-            if (snapshot.exists()) {
-                val role = snapshot.getValue(String::class.java)
-                Log.d("UserRepository", "Fetched role: $role for UID: $uid")
-                role
+    suspend fun fetchUserRole(email: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val user = sqliteUserRepository.getUserByEmail(email)
+            if (user != null) {
+                Log.d("UserRepository", "Fetched role: ${user.role} for email: $email")
+                user.role
             } else {
-                Log.e("UserRepository", "User role not found for UID: $uid")
+                Log.e("UserRepository", "User not found for email: $email")
                 null
             }
         } catch (e: Exception) {
@@ -48,34 +41,8 @@ class UserRepository {
     suspend fun fetchUserData(userId: String): Result<UserData> {
         return try {
             Log.d("UserRepository", "Attempting to fetch user data for userId: $userId")
-            val snapshot = database.child(userId).get().await()
-
-            if (snapshot.exists()) {
-                // Log all children of the snapshot for debugging
-                Log.d("UserRepository", "Raw snapshot value: ${snapshot.value}")
-                snapshot.children.forEach { child ->
-                    Log.d("UserRepository", "Found field: ${child.key} with value: ${child.value}")
-                }
-
-                // Try both 'phoneNumber' and 'phone' fields
-                val phone = snapshot.child("phone").getValue(String::class.java) 
-                    ?: snapshot.child("phoneNumber").getValue(String::class.java)
-                    ?: ""
-                Log.d("UserRepository", "Found phone value: $phone")
-
-                val userData = UserData(
-                    name = snapshot.child("name").getValue(String::class.java) ?: "",
-                    email = snapshot.child("email").getValue(String::class.java) ?: "",
-                    phoneNumber = phone,
-                    role = snapshot.child("role").getValue(String::class.java) ?: "",
-                    profilePicUrl = snapshot.child("profilePicUrl").getValue(String::class.java)
-                )
-                Log.d("UserRepository", "Successfully fetched user data: $userData")
-                Result.success(userData)
-            } else {
-                Log.e("UserRepository", "User not found for userId: $userId")
-                Result.failure(Exception("User not found"))
-            }
+            // Removed Firebase logic
+            Result.failure(Exception("Not implemented"))
         } catch (e: Exception) {
             Log.e("UserRepository", "Error fetching user data: ${e.message}")
             Result.failure(e)
@@ -85,20 +52,8 @@ class UserRepository {
     suspend fun fetchOperatorData(userId: String): Result<OperatorData> {
         return try {
             Log.d("UserRepository", "Attempting to fetch operator data for userId: $userId")
-            val snapshot = database.child(userId).get().await()
-
-            if (snapshot.exists() && snapshot.child("role").getValue(String::class.java) == "Matatu Operator") {
-                val operatorData = OperatorData(
-                    businessName = snapshot.child("businessName").getValue(String::class.java) ?: "",
-                    businessAddress = snapshot.child("businessAddress").getValue(String::class.java) ?: "",
-                    licenseNumber = snapshot.child("licenseNumber").getValue(String::class.java) ?: ""
-                )
-                Log.d("UserRepository", "Successfully fetched operator data: $operatorData")
-                Result.success(operatorData)
-            } else {
-                Log.e("UserRepository", "Operator data not found for userId: $userId")
-                Result.failure(Exception("Operator data not found"))
-            }
+            // Removed Firebase logic
+            Result.failure(Exception("Not implemented"))
         } catch (e: Exception) {
             Log.e("UserRepository", "Error fetching operator data: ${e.message}")
             Result.failure(e)

@@ -24,14 +24,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.dynamic_fare.auth.*
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
+import com.google.android.gms.auth.api.identity.Identity
 
 @Composable
 fun LoginScreenContent(navController: NavController) {
     val context = LocalContext.current
-    val authRepository = AuthRepository(context)
-    val userRepository = UserRepository()
+    val sqliteUserRepository = SqliteUserRepository(context)
+    val authRepository = AuthRepository(context, sqliteUserRepository)
+    val userRepository = UserRepository(context)
     val authViewModel: AuthViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository, userRepository)
     )
@@ -50,7 +50,7 @@ fun LoginScreenContent(navController: NavController) {
 
             if (googleIdToken != null) {
                 authViewModel.googleSignIn(googleIdToken) { role ->
-                    navigateByRole(navController, role)
+                    navigateByRole(navController, role, email)
                 }
             }
         }
@@ -108,7 +108,7 @@ fun LoginScreenContent(navController: NavController) {
             onClick = {
                 authViewModel.loginUser(email, password) { result ->
                     if (result == "Matatu Operator" || result == "Matatu Client") {
-                        navigateByRole(navController, result)
+                        navigateByRole(navController, result, email)
                     } else {
                         errorMessage = result // Show error message
                     }
@@ -134,24 +134,24 @@ fun LoginScreenContent(navController: NavController) {
         Spacer(modifier = Modifier.height(20.dp))
 
         // 🔹 Google Sign-In Button
-        Button(
-            onClick = {
-                val signInRequest = authRepository.googleSignInRequest()
-                val oneTapClient = com.google.android.gms.auth.api.identity.Identity.getSignInClient(context)
-                oneTapClient.beginSignIn(signInRequest)
-                    .addOnSuccessListener { result ->
-                        launcher.launch(IntentSenderRequest.Builder(result.pendingIntent.intentSender).build())
-                    }
-                    .addOnFailureListener { e ->
-                        Toast.makeText(context, "Google Sign-in failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.fillMaxWidth().height(50.dp)
-        ) {
-            Text("Sign in with Google", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
+        // Button(
+        //     onClick = {
+        //         val signInRequest = authRepository.googleSignInRequest()
+        //         val oneTapClient = com.google.android.gms.auth.api.identity.Identity.getSignInClient(context)
+        //         oneTapClient.beginSignIn(signInRequest)
+        //             .addOnSuccessListener { result ->
+        //                 launcher.launch(IntentSenderRequest.Builder(result.pendingIntent.intentSender).build())
+        //             }
+        //             .addOnFailureListener { e ->
+        //                 Toast.makeText(context, "Google Sign-in failed: ${e.message}", Toast.LENGTH_SHORT).show()
+        //             }
+        //     },
+        //     colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+        //     shape = RoundedCornerShape(8.dp),
+        //     modifier = Modifier.fillMaxWidth().height(50.dp)
+        // ) {
+        //     Text("Sign in with Google", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        // }
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -186,42 +186,25 @@ fun LoginScreenContent(navController: NavController) {
     }
 }
 
-fun navigateByRole(navController: NavController, role: String?) {
-    val auth = FirebaseAuth.getInstance()
-    val userId = auth.currentUser?.uid
-
-    if (userId == null) {
-        Toast.makeText(navController.context, "Authentication error", Toast.LENGTH_SHORT).show()
+fun navigateByRole(navController: NavController, role: String?, email: String? = null) {
+    Log.d("LoginNavigation", "navigateByRole called with role=$role, email=$email")
+    if (email.isNullOrEmpty()) {
+        Toast.makeText(navController.context, "Email not found!", Toast.LENGTH_SHORT).show()
+        navController.navigate(Routes.LoginScreenContent) {
+            popUpTo(Routes.LoginScreenContent) { inclusive = true }
+        }
         return
     }
-
     when (role) {
         "Matatu Operator" -> {
-            val db = FirebaseDatabase.getInstance().reference.child("users").child(userId)
-            Log.d("LoginScreen", "Fetching user data for userId: $userId")
-            
-            db.get().addOnSuccessListener { snapshot ->
-                val operatorId = snapshot.child("operatorId").value as? String
-                Log.d("LoginScreen", "Raw operatorId from database: $operatorId")
-                
-                if (!operatorId.isNullOrEmpty()) {
-                    Log.d("LoginScreen", "Successfully retrieved operatorId: $operatorId")
-                    Log.d("LoginScreen", "Navigating to operator home with operatorId: $operatorId")
-                    navController.navigate(Routes.operatorHomeRoute(operatorId)) {
-                        popUpTo(Routes.LoginScreenContent) { inclusive = true }
-                    }
-                } else {
-                    Log.e("LoginScreen", "Operator ID is null or empty for userId: $userId")
-                    Toast.makeText(navController.context, "Operator ID not found!", Toast.LENGTH_SHORT).show()
-                }
-            }.addOnFailureListener { e ->
-                Log.e("LoginScreen", "Error retrieving operatorId", e)
-                Toast.makeText(navController.context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            Log.d("LoginNavigation", "Navigating to operatorHomeScreen with operatorId=$email")
+            navController.navigate(Routes.operatorHomeRoute(email)) {
+                popUpTo(Routes.LoginScreenContent) { inclusive = true }
             }
         }
         "Matatu Client" -> {
-            Log.d("LoginScreen", "Navigating to client home with userId: $userId")
-            navController.navigate(Routes.homeRoute(userId)) {
+            Log.d("LoginNavigation", "Navigating to clientHome for userId=$email")
+            navController.navigate("clientHome") {
                 popUpTo(Routes.LoginScreenContent) { inclusive = true }
             }
         }

@@ -13,14 +13,15 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.google.firebase.auth.FirebaseAuth
+import com.example.dynamic_fare.auth.SqliteUserRepository
+import kotlinx.coroutines.launch
 
 @Composable
 fun PasswordRecoveryScreen(navController: NavController) {
     val context = LocalContext.current
-    val auth = FirebaseAuth.getInstance()
     var email by remember { mutableStateOf(TextFieldValue("")) }
     var isProcessing by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -52,21 +53,17 @@ fun PasswordRecoveryScreen(navController: NavController) {
             onClick = {
                 if (email.text.isNotBlank() && !isProcessing) {
                     isProcessing = true
-                    auth.sendPasswordResetEmail(email.text)
-                        .addOnSuccessListener {
-                            Toast.makeText(context, "Password reset email sent!", Toast.LENGTH_SHORT).show()
-                            isProcessing = false
-
-                            if (navController.previousBackStackEntry != null) {
-                                navController.popBackStack()
-                            } else {
-                                navController.navigate(Routes.LoginScreenContent) { popUpTo(Routes.LoginScreenContent) { inclusive = true } }
-                            }
-                        }
-                        .addOnFailureListener {
-                            Toast.makeText(context, "Failed: ${it.message}", Toast.LENGTH_SHORT).show()
+                    val userRepo = SqliteUserRepository(context)
+                    val nav = navController
+                    coroutineScope.launch {
+                        val user = userRepo.getUserByEmail(email.text)
+                        if (user != null) {
+                            nav.navigate("setNewPassword/${email.text}")
+                        } else {
+                            Toast.makeText(context, "No account found for this email.", Toast.LENGTH_SHORT).show()
                             isProcessing = false
                         }
+                    }
                 } else {
                     Toast.makeText(context, "Enter an email!", Toast.LENGTH_SHORT).show()
                 }

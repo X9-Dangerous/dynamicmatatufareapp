@@ -36,6 +36,7 @@ object Routes {
     const val SettingsScreen = "settings/{userId}"
     const val AccessibilitySettingsScreen = "accessibility/{userId}"
     const val ClientProfileScreen = "clientProfile/{userId}"
+    const val SetNewPasswordScreen = "setNewPassword/{email}"
 
     fun matatuEstimateRoute(): String = "clientHome"
     fun operatorHomeRoute(operatorId: String): String = "operatorHomeScreen/$operatorId"
@@ -200,6 +201,13 @@ fun AppNavigation(
         ) { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
             ProfileScreen(navController, userId)
+        }
+        composable(
+            route = Routes.SetNewPasswordScreen,
+            arguments = listOf(navArgument("email") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            SetNewPasswordScreen(navController, email)
         }
     }
 }

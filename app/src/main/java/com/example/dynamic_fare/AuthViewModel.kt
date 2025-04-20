@@ -13,59 +13,44 @@ class AuthViewModel(
     fun loginUser(email: String, password: String, onResult: (String?) -> Unit) {
         // Validate Inputs First
         if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            android.util.Log.e("AuthViewModel", "Login failed: Invalid email format: $email")
             onResult("Invalid email format")
             return
         }
 
         if (password.isBlank() || password.length < 6) {
+            android.util.Log.e("AuthViewModel", "Login failed: Password too short")
             onResult("Password must be at least 6 characters")
             return
         }
 
         viewModelScope.launch {
             try {
-                val authResult = authRepository.loginWithEmail(email, password)
-                val user = authResult?.user
-
-                if (user != null) {
-                    val uid = user.uid
-                    Log.d("AuthViewModel", "Login successful! UID: $uid")
-
-                    val role = userRepository.fetchUserRole(uid)
+                android.util.Log.d("AuthViewModel", "Attempting login for $email")
+                val loginSuccess = authRepository.loginWithEmail(email, password)
+                if (loginSuccess) {
+                    android.util.Log.d("AuthViewModel", "Login success, fetching role for $email")
+                    val role = userRepository.fetchUserRole(email)
+                    android.util.Log.d("AuthViewModel", "Fetched role: $role for $email")
                     if (role != null) {
                         onResult(role)
                     } else {
+                        android.util.Log.e("AuthViewModel", "User does not exist in database: $email")
                         onResult("User does not exist in database")
                     }
                 } else {
-                    Log.e("AuthViewModel", "Login failed: User is null")
+                    android.util.Log.e("AuthViewModel", "Login failed: No user found for $email")
                     onResult("Login failed: No user found")
                 }
             } catch (e: Exception) {
-                Log.e("AuthViewModel", "Login error: ${e.message}")
+                android.util.Log.e("AuthViewModel", "Login error: ${e.message}")
                 onResult("Login error: ${e.message}")
             }
         }
     }
 
+    // Google sign-in is not supported in SQLite-only mode. Stub implementation.
     fun googleSignIn(idToken: String, onResult: (String?) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val authResult = authRepository.firebaseAuthWithGoogle(idToken)
-                val uid = authResult?.user?.uid
-
-                if (uid != null) {
-                    val role = userRepository.fetchUserRole(uid)
-                    Log.d("AuthViewModel", "Google sign-in role: $role")
-                    onResult(role)
-                } else {
-                    Log.e("AuthViewModel", "Google sign-in failed: No UID")
-                    onResult(null)
-                }
-            } catch (e: Exception) {
-                Log.e("AuthViewModel", "Google sign-in error: ${e.message}")
-                onResult(null)
-            }
-        }
+        onResult("Google sign-in is disabled in offline mode.")
     }
 }

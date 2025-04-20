@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.dynamic_fare.auth.SqliteUserRepository
 import com.example.dynamic_fare.data.FareRepository
 import com.example.dynamic_fare.data.FleetRepository
 import com.example.dynamic_fare.data.MatatuRepository
@@ -56,12 +57,15 @@ fun PaymentPage(
 
     // Fetch user's phone number and accessibility settings from SQLite (not Firebase)
     LaunchedEffect(userId) {
-        // TODO: Replace with your own local user settings/phone fetch logic
-        // For now, disable M-Pesa autofill and accessibility fetch
-        isDisabled = false
-        phoneNumber = ""
-        isPhoneLoaded = false
-        // If you have a UserRepository or similar, fetch user details here
+        val userRepository = com.example.dynamic_fare.auth.SqliteUserRepository(context)
+        val user = userRepository.getUserByEmail(userId)
+        if (user != null) {
+            phoneNumber = user.phone
+            isPhoneLoaded = true
+        } else {
+            phoneNumber = ""
+            isPhoneLoaded = false
+        }
     }
 
     // Fetch matatu details and fleet information from SQLite
