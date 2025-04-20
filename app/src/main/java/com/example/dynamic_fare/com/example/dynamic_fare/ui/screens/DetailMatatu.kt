@@ -20,19 +20,20 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavController
-import com.example.dynamic_fare.SetFaresActivity
+import com.example.dynamic_fare.data.MatatuRepository
 import com.example.dynamic_fare.data.FareRepository
 import com.example.dynamic_fare.models.MatatuFares
-import com.google.firebase.storage.FirebaseStorage
+import com.example.dynamic_fare.SetFaresActivity
 import android.content.ContentValues
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.ui.graphics.Color
 import androidx.navigation.compose.rememberNavController
-import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 class FareTabbedActivity : ComponentActivity() {
@@ -80,16 +81,36 @@ fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
     var matatuDetails by remember { mutableStateOf<MatatuDetails?>(null) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val matatuRepository = remember(context) { MatatuRepository(context) }
 
     LaunchedEffect(matatuId) {
-        val database = FirebaseDatabase.getInstance().getReference("matatus")
-        database.child(matatuId).get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                matatuDetails = snapshot.getValue(MatatuDetails::class.java)
+        // This is already a coroutine context, so we don't need another launch
+        try {
+            // Use Room repository instead of Firebase
+            val matatu = matatuRepository.fetchMatatuDetails(matatuId)
+            if (matatu != null) {
+                // Convert Matatu to MatatuDetails
+                matatuDetails = MatatuDetails(
+                    matatuId = matatu.matatuId,
+                    registrationNumber = matatu.registrationNumber,
+                    routeStart = matatu.routeStart,
+                    routeEnd = matatu.routeEnd,
+                    stops = matatu.stops,
+                    mpesaOption = matatu.mpesaOption,
+                    pochiNumber = matatu.pochiNumber,
+                    sendMoneyPhone = matatu.sendMoneyPhone,
+                    tillNumber = matatu.tillNumber,
+                    paybillNumber = matatu.paybillNumber,
+                    accountNumber = matatu.accountNumber,
+                    operatorId = matatu.operatorId
+                )
+                Log.d("MatatuDetailsScreen", "Loaded matatu details from Room: ${matatu.matatuId}, reg: ${matatu.registrationNumber}")
             } else {
+                Log.e("MatatuDetailsScreen", "Matatu details not found in Room for ID: $matatuId")
                 Toast.makeText(context, "Matatu details not found", Toast.LENGTH_SHORT).show()
             }
-        }.addOnFailureListener { e ->
+        } catch (e: Exception) {
+            Log.e("MatatuDetailsScreen", "Error loading matatu details: ${e.message}")
             Toast.makeText(context, "Error loading matatu details: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
@@ -115,19 +136,18 @@ fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
                 var showQrDialog by remember { mutableStateOf(false) }
                 var isDownloading by remember { mutableStateOf(false) }
                 val context = LocalContext.current
-                val storage = FirebaseStorage.getInstance()
                 var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
-                // Load QR code from Firebase Storage using registration number
+                // Load QR code from SQLite/Room using registration number
                 LaunchedEffect(details.registrationNumber) {
-                    val qrRef = storage.reference.child("qr_codes/${details.registrationNumber}.png")
-                    qrRef.getBytes(1024 * 1024) // Max 1MB
-                        .addOnSuccessListener { bytes ->
-                            qrBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        }
-                        .addOnFailureListener { e ->
-                            Toast.makeText(context, "Failed to load QR code: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
+                    val db = com.example.dynamic_fare.AppDatabase.getDatabase(context)
+                    val qrCodeDao = db.qrCodeDao()
+                    val qrCode = qrCodeDao.getQrCode(details.registrationNumber)
+                    if (qrCode != null) {
+                        qrBitmap = android.graphics.BitmapFactory.decodeByteArray(qrCode.qrImage, 0, qrCode.qrImage.size)
+                    } else {
+                        Toast.makeText(context, "Failed to load QR code: No QR code found in local database.", Toast.LENGTH_SHORT).show()
+                    }
                 }
 
                 Card(
@@ -427,14 +447,24 @@ private fun DetailRow(
 
 @Composable
 fun FareDetailsScreen(matatuId: String) {
-    val context = LocalContext.current
     var fareData by remember { mutableStateOf<MatatuFares?>(null) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val fareRepository = remember(context) { FareRepository(context) }
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(matatuId) {
-        FareRepository.getFareDetails(matatuId) { fetchedFares ->
-            fareData = fetchedFares
-            isLoading = false
+        coroutineScope.launch {
+            try {
+                // Use Room instead of Firebase
+                val loadedFares = fareRepository.getFareDetails(matatuId)
+                fareData = loadedFares
+                Log.d("FareDetailsScreen", "Loaded fares: $loadedFares for matatu: $matatuId")
+            } catch (e: Exception) {
+                Log.e("FareDetailsScreen", "Error loading fares: ${e.message}")
+            } finally {
+                isLoading = false
+            }
         }
     }
 

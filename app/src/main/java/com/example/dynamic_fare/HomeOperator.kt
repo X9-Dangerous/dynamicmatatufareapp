@@ -25,7 +25,10 @@ import com.example.dynamic_fare.data.FleetRepository
 import com.example.dynamic_fare.models.Fleet
 import com.example.dynamic_fare.models.Matatu
 import com.example.dynamic_fare.ui.components.BottomNavigationBar
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +38,10 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
     val fleetList = remember { mutableStateListOf<Fleet>() }
     var isLoadingMatatus by remember { mutableStateOf(true) }
     var isLoadingFleets by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val matatuRepository = remember(context) { MatatuRepository(context) }
+    val fleetRepository = remember(context) { FleetRepository(context) }
 
     LaunchedEffect(operatorId) {
         Log.d("OperatorHomeScreen", "Starting data load for operatorId: $operatorId")
@@ -42,19 +49,23 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
             Log.e("OperatorHomeScreen", "Invalid operatorId: empty or blank")
             return@LaunchedEffect
         }
-        
         // Load matatus
         Log.d("OperatorHomeScreen", "Fetching matatus for operatorId: $operatorId")
-        MatatuRepository.fetchMatatusForOperator(operatorId) { matatus ->
-            Log.d("OperatorHomeScreen", "Received ${matatus.size} matatus for operatorId: $operatorId")
+        coroutineScope.launch {
+            val matatus = matatuRepository.fetchMatatusForOperator(operatorId)
+            Log.d("OperatorHomeScreen", "Received "+matatus.size+" matatus for operatorId: $operatorId")
             matatuList.clear()
             matatuList.addAll(matatus)
+            // Log all matatu IDs and registration numbers for debugging
+            matatuList.forEach {
+                Log.d("OperatorHomeScreen", "Matatu loaded: id=${it.matatuId}, reg=${it.registrationNumber}")
+            }
             isLoadingMatatus = false
         }
-
-        // Load fleets
+        // Load fleets using the new SQLite-based approach
         Log.d("OperatorHomeScreen", "Fetching fleets for operatorId: $operatorId")
-        FleetRepository.fetchFleetsForOperator(operatorId) { fleets: List<Fleet> ->
+        coroutineScope.launch {
+            val fleets = fleetRepository.fetchFleetsForOperator(operatorId)
             Log.d("OperatorHomeScreen", "Received ${fleets.size} fleets for operatorId: $operatorId")
             fleetList.clear()
             fleetList.addAll(fleets)
@@ -117,7 +128,7 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
                 }
             } else {
                 when (selectedTab) {
-                    0 -> MatatuList(navController, matatuList, operatorId)
+                    0 -> MatatuList(navController, matatuList, operatorId, coroutineScope, matatuRepository)
                     1 -> FleetList(navController, fleetList, operatorId)
                 }
             }
@@ -126,13 +137,13 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
 }
 
 @Composable
-fun MatatuList(navController: NavController, matatuList: List<Matatu>, operatorId: String) {
+fun MatatuList(navController: NavController, matatuList: List<Matatu>, operatorId: String, coroutineScope: CoroutineScope, matatuRepository: MatatuRepository) {
     if (matatuList.isEmpty()) {
         EmptyStateMessage("No Matatus Available")
     } else {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(matatuList) { matatu ->
-                MatatuDetailItem(matatu, navController, operatorId)
+                MatatuDetailItem(matatu, navController, operatorId, coroutineScope, matatuRepository)
             }
         }
     }
@@ -153,31 +164,25 @@ fun FleetList(navController: NavController, fleetList: List<Fleet>, operatorId: 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MatatuDetailItem(matatu: Matatu, navController: NavController, operatorId: String) {
+fun MatatuDetailItem(matatu: Matatu, navController: NavController, operatorId: String, coroutineScope: CoroutineScope, matatuRepository: MatatuRepository) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
             .clickable {
-                try {
-                    // Use matatuId for navigation
-                    if (matatu.matatuId.isNotEmpty()) {
-                        Log.d("Navigation", "Navigating with matatuId: ${matatu.matatuId}")
-                        navController.navigate(Routes.fareTabbedRoute(matatu.matatuId))
-                    } else {
-                        // If matatuId is empty, try to find it using registration number
-                        Log.d("Navigation", "Looking up matatuId for registration: ${matatu.registrationNumber}")
-                        MatatuRepository.getMatatuIdByRegistration(matatu.registrationNumber) { foundMatatuId ->
-                            if (foundMatatuId != null && foundMatatuId.isNotEmpty()) {
-                                Log.d("Navigation", "Found matatuId: $foundMatatuId")
-                                navController.navigate(Routes.fareTabbedRoute(foundMatatuId))
-                            } else {
-                                Log.e("Navigation", "Could not find matatuId for registration: ${matatu.registrationNumber}")
-                            }
+                if (matatu.matatuId.isNotEmpty()) {
+                    Log.d("MatatuDetailNav", "Navigating to details with matatuId=${matatu.matatuId}")
+                    navController.navigate(Routes.fareTabbedRoute(matatu.matatuId))
+                } else {
+                    coroutineScope.launch {
+                        val foundMatatuId = matatuRepository.getMatatuIdByRegistration(matatu.registrationNumber)
+                        Log.d("MatatuDetailNav", "Looked up matatuId for reg=${matatu.registrationNumber}, found=$foundMatatuId")
+                        if (!foundMatatuId.isNullOrEmpty()) {
+                            navController.navigate(Routes.fareTabbedRoute(foundMatatuId))
+                        } else {
+                            Log.e("MatatuDetailNav", "Could not find matatuId for registration: ${matatu.registrationNumber}")
                         }
                     }
-                } catch (e: Exception) {
-                    Log.e("Navigation", "Error navigating to detail: ${e.message}")
                 }
             },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -219,20 +224,14 @@ fun MatatuDetailItem(matatu: Matatu, navController: NavController, operatorId: S
                         TextButton(
                             onClick = {
                                 showDeleteDialog = false
-                                MatatuRepository.deleteMatatu(matatu.matatuId) { success ->
-                                    if (success) {
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            "Matatu deleted successfully",
-                                            android.widget.Toast.LENGTH_SHORT
-                                        ).show()
-                                    } else {
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            "Failed to delete matatu",
-                                            android.widget.Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
+                                coroutineScope.launch {
+                                    val matatuToDelete = matatu 
+                                    matatuRepository.deleteMatatu(matatuToDelete)
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Matatu deleted successfully",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                             }
                         ) {

@@ -3,8 +3,6 @@ package com.example.dynamic_fare
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,9 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dynamic_fare.data.FareRepository
 import com.example.dynamic_fare.ui.screens.FareTabbedActivity
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.DatabaseReference
 import androidx.compose.material3.ButtonDefaults
+import kotlinx.coroutines.launch
 
 
 class SetFaresActivity : ComponentActivity() {
@@ -42,8 +39,9 @@ class SetFaresActivity : ComponentActivity() {
 @Composable
 fun SetFaresScreen(matatuId: String) {
     Log.d("SetFaresScreen", "Rendering with matatuId: $matatuId")
-    val db = FirebaseDatabase.getInstance()
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val fareRepository = remember(context) { FareRepository(context) }
 
     // State variables to store fare values
     var peakHours by remember { mutableStateOf("") }
@@ -113,8 +111,7 @@ fun SetFaresScreen(matatuId: String) {
         OutlinedTextField(
             value = disabilityDiscount,
             onValueChange = { disabilityDiscount = it },
-            label = { Text("Set Disability Discount % (Optional)") },
-            placeholder = { Text("Enter percentage e.g. 20 for 20%") },
+            label = { Text("Set Disability Discount (%)") },
             keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
@@ -162,27 +159,27 @@ fun SetFaresScreen(matatuId: String) {
                 Log.d("SetFaresScreen", "Saving fares for matatuId: $matatuId")
                 Log.d("SetFaresScreen", "Fare values: peak=$peakHours, nonPeak=$nonPeakHours, rainyPeak=$rainingPeakFare, rainyNonPeak=$rainingNonPeakFare, discount=$disabilityDiscount")
 
-                FareRepository.saveFares(
-                    matatuId = matatuId,
-                    peak = peakHours,
-                    nonPeak = nonPeakHours,
-                    rainyPeak = rainingPeakFare,
-                    rainyNonPeak = rainingNonPeakFare,
-                    discount = disabilityDiscount
-                ) { resultMessage ->
+                coroutineScope.launch {
+                    val resultMessage = fareRepository.saveFares(
+                        matatuId = matatuId,
+                        peak = peakHours,
+                        nonPeak = nonPeakHours,
+                        rainyPeak = rainingPeakFare,
+                        rainyNonPeak = rainingNonPeakFare,
+                        discount = disabilityDiscount
+                    )
+                    
                     message = resultMessage
 
                     if (resultMessage == "✅ Fares saved successfully!") {
-                        Handler(Looper.getMainLooper()).post {
-                            // Navigate back to MatatuDetailsScreen
-                            val intent = Intent(context, FareTabbedActivity::class.java).apply {
-                                putExtra("matatuId", matatuId)
-                                // Clear the back stack
-                                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                            }
-                            context.startActivity(intent)
-                            (context as? ComponentActivity)?.finish() // Close the current activity
+                        // Navigate back to MatatuDetailsScreen
+                        val intent = Intent(context, FareTabbedActivity::class.java).apply {
+                            putExtra("matatuId", matatuId)
+                            // Clear the back stack
+                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
                         }
+                        context.startActivity(intent)
+                        (context as? ComponentActivity)?.finish() // Close the current activity
                     }
                 }
             },

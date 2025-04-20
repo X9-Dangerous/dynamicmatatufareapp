@@ -15,7 +15,12 @@ import com.journeyapps.barcodescanner.ScanOptions
 
 @Composable
 fun QRScannerScreen(navController: NavController) {
-    val context = LocalContext.current as Activity
+    val context = LocalContext.current
+    val activity = context as? Activity
+    if (activity == null) {
+        Text("Error: Not in an Activity context.")
+        return
+    }
     var scannedData by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 

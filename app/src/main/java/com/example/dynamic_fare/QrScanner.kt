@@ -20,10 +20,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Button
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
 import androidx.camera.core.ExperimentalGetImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -40,6 +40,10 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,54 +110,42 @@ fun QRScannerScreen(
                     onBarcodeScanned = { barcodeValue ->
                         if (scannedValue == null) {
                             scannedValue = barcodeValue
-                            // Get matatu ID from Firebase using registration number
-                            val database = com.google.firebase.database.FirebaseDatabase.getInstance()
-                            val matatusRef = database.getReference("matatus")
+                            // Instead of Firebase, use local Room DB to check for Matatu by registration number
+                            val db = com.example.dynamic_fare.AppDatabase.getDatabase(context)
+                            
+                            android.util.Log.d("QRScanner", "Scanning for registration number: $barcodeValue")
+                            kotlinx.coroutines.MainScope().launch {
+                                try {
+                                    val matatuDao = db.matatuDao()
+                                    // Print all matatus for debug
+                                    val allMatatus = withContext(Dispatchers.IO) { matatuDao.getAllMatatus() }
+                                    android.util.Log.d("QRScanner", "All registrations in DB: " + allMatatus.joinToString { it.registrationNumber })
 
-                            android.util.Log.d("QRScanner", "Looking up matatu with registration number: $barcodeValue")
-
-                            // Query all matatus to find matching registration
-                            matatusRef.get().addOnSuccessListener { snapshot ->
-                                if (snapshot.exists()) {
-                                    android.util.Log.d("QRScanner", "Found matatus in database, searching for registration: $barcodeValue")
-                                    var foundMatatu = false
-                                    snapshot.children.forEach { matatuSnapshot ->
-                                        val registration = matatuSnapshot.child("registrationNumber").value?.toString()
-                                        android.util.Log.d("QRScanner", "Checking matatu ${matatuSnapshot.key} with registration: $registration")
-                                        if (registration == barcodeValue) {
-                                            foundMatatu = true
-                                            val matatuId = matatuSnapshot.key
-                                            android.util.Log.d("QRScanner", "Found matching matatu! ID: $matatuId")
-                                            android.util.Log.d("QRScanner", "Navigating to payment with userId: $userId")
-                                            navController.navigate(Routes.paymentPageWithQRCode(matatuId!!, userId)) {
-                                                popUpTo(Routes.QRScannerScreen) { inclusive = true }
-                                            }
-                                            return@forEach
+                                    // Normalize scanned value for comparison
+                                    val normalizedBarcodeValue = barcodeValue.trim().lowercase()
+                                    val matatu = allMatatus.find { it.registrationNumber.trim().lowercase() == normalizedBarcodeValue }
+                                    // If you want to keep using the DB query, you could also update your schema/query for case-insensitive matching
+                                    if (matatu != null) {
+                                        android.util.Log.d("QRScanner", "Found matatu: ${matatu.registrationNumber}, ID: ${matatu.matatuId}")
+                                        navController.navigate(com.example.dynamic_fare.Routes.paymentPageWithQRCode(matatu.registrationNumber, userId)) {
+                                            popUpTo(com.example.dynamic_fare.Routes.QRScannerScreen) { inclusive = true }
                                         }
-                                    }
-                                    if (!foundMatatu) {
-                                        android.util.Log.d("QRScanner", "No matatu found with registration: $barcodeValue")
+                                    } else {
+                                        android.util.Log.d("QRScanner", "No matatu found with registration number: $barcodeValue (normalized: $normalizedBarcodeValue)")
                                         android.widget.Toast.makeText(
                                             context,
-                                            "No matatu found with registration number: $barcodeValue",
+                                            "No matatu found with this registration number: $barcodeValue",
                                             android.widget.Toast.LENGTH_SHORT
                                         ).show()
                                     }
-                                } else {
-                                    android.util.Log.d("QRScanner", "No matatus exist in database")
+                                } catch (e: Exception) {
+                                    android.util.Log.e("QRScanner", "Error looking up matatu: ${e.message}", e)
                                     android.widget.Toast.makeText(
                                         context,
-                                        "No matatus found in database",
+                                        "Error looking up matatu: ${e.message}",
                                         android.widget.Toast.LENGTH_SHORT
                                     ).show()
                                 }
-                            }.addOnFailureListener { e ->
-                                android.util.Log.e("QRScanner", "Error querying database: ${e.message}")
-                                android.widget.Toast.makeText(
-                                    context,
-                                    "Error looking up matatu: ${e.message}",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
                             }
                         }
                     }

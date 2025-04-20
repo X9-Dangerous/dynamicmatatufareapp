@@ -520,11 +520,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Show loading or error message
-        if (isLoading) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Loading route...", color = Color.Gray, modifier = Modifier.padding(horizontal = 16.dp))
-        }
+
 
         errorMessage?.let {
             Spacer(modifier = Modifier.height(8.dp))

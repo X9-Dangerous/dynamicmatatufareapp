@@ -1,28 +1,32 @@
 package com.example.dynamic_fare.data
 
+import android.content.Context
 import android.util.Log
+import com.example.dynamic_fare.AppDatabase
 import com.example.dynamic_fare.models.Fleet
-import com.google.firebase.database.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
-object FleetRepository {
-    private val database = FirebaseDatabase.getInstance().reference.child("fleets")
+class FleetRepository(context: Context) {
+    private val fleetDao = AppDatabase.getDatabase(context).fleetDao()
 
-    // Register a new fleet with only fleetId, fleetName, operatorId
+    // Register a new fleet with fleetName and operatorId
     suspend fun registerFleet(
         fleetName: String,
         operatorId: String
     ): String? = withContext(Dispatchers.IO) {
         return@withContext try {
-            val fleetId = database.push().key ?: return@withContext null
-            val fleetData = mapOf(
-                "fleetId" to fleetId,
-                "fleetName" to fleetName,
-                "operatorId" to operatorId
+            // Generate a unique ID for the fleet
+            val fleetId = System.currentTimeMillis().toString()
+            val fleet = Fleet(
+                fleetId = fleetId,
+                fleetName = fleetName,
+                operatorId = operatorId
             )
-            database.child(fleetId).setValue(fleetData).await()
+            fleetDao.insertFleet(fleet)
             fleetId
         } catch (e: Exception) {
             Log.e("FleetRepository", "Error registering fleet", e)
@@ -30,43 +34,43 @@ object FleetRepository {
         }
     }
 
-    // Fetch fleets for a given operator with real-time updates
-    fun fetchFleetsForOperator(operatorId: String, onResult: (List<Fleet>) -> Unit) {
-        database.orderByChild("operatorId").equalTo(operatorId)
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val fleets = snapshot.children.mapNotNull { it.getValue(Fleet::class.java) }
-                    onResult(fleets)
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    Log.e("FleetRepository", "Error fetching fleets", error.toException())
-                    onResult(emptyList())
-                }
-            })
+    // Fetch fleets for a given operator
+    suspend fun fetchFleetsForOperator(operatorId: String): List<Fleet> = withContext(Dispatchers.IO) {
+        try {
+            fleetDao.getFleetsByOperatorId(operatorId)
+        } catch (e: Exception) {
+            Log.e("FleetRepository", "Error fetching fleets", e)
+            emptyList()
+        }
     }
 
-    // Fetch details of a specific fleet with real-time updates
-    fun fetchFleetDetails(fleetId: String, onResult: (Fleet?) -> Unit) {
-        database.child(fleetId).addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val fleet = snapshot.getValue(Fleet::class.java)
-                onResult(fleet)
-            }
+    // Get fleets for an operator as a Flow for reactivity
+    fun getFleetsForOperatorAsFlow(operatorId: String): Flow<List<Fleet>> = flow {
+        try {
+            val fleets = fleetDao.getFleetsByOperatorId(operatorId)
+            emit(fleets)
+        } catch (e: Exception) {
+            Log.e("FleetRepository", "Error fetching fleets as flow", e)
+            emit(emptyList())
+        }
+    }.flowOn(Dispatchers.IO)
 
-            override fun onCancelled(error: DatabaseError) {
-                Log.e("FleetRepository", "Error fetching fleet details", error.toException())
-                onResult(null)
-            }
-        })
+    // Fetch details of a specific fleet
+    suspend fun fetchFleetDetails(fleetId: String): Fleet? = withContext(Dispatchers.IO) {
+        try {
+            fleetDao.getFleetById(fleetId)
+        } catch (e: Exception) {
+            Log.e("FleetRepository", "Error fetching fleet details", e)
+            null
+        }
     }
 
     // Delete a fleet
     suspend fun deleteFleet(fleetId: String): Boolean = withContext(Dispatchers.IO) {
         return@withContext try {
-            val snapshot = database.child(fleetId).get().await()
-            if (snapshot.exists()) {
-                database.child(fleetId).removeValue().await()
+            val fleet = fleetDao.getFleetById(fleetId)
+            if (fleet != null) {
+                fleetDao.deleteFleetById(fleetId)
                 true
             } else {
                 Log.e("FleetRepository", "Fleet not found")
@@ -76,5 +80,23 @@ object FleetRepository {
             Log.e("FleetRepository", "Error deleting fleet", e)
             false
         }
+    }
+
+    // Compatibility method for callback-based code that previously used Firebase
+    // This simulates the Firebase callback pattern with the new SQLite implementation
+    fun fetchFleetDetails(fleetId: String, onResult: (Fleet?) -> Unit) {
+        Thread {
+            try {
+                // Use runBlocking to call the suspend function from a non-coroutine context
+                // This is safe because we're already in a background thread
+                val fleet = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) { 
+                    fleetDao.getFleetById(fleetId) 
+                }
+                onResult(fleet)
+            } catch (e: Exception) {
+                Log.e("FleetRepository", "Error in callback fetchFleetDetails", e)
+                onResult(null)
+            }
+        }.start()
     }
 }

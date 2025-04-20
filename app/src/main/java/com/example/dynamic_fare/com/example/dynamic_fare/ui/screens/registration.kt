@@ -53,9 +53,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.example.dynamic_fare.Routes
 import androidx.compose.foundation.layout.statusBarsPadding
-import com.google.firebase.storage.FirebaseStorage
+import com.example.dynamic_fare.models.QrCode
+import com.example.dynamic_fare.AppDatabase
+import java.util.UUID
 import java.io.ByteArrayOutputStream
-import com.google.firebase.database.FirebaseDatabase
 
 // Data class to hold GTFS stop suggestion
 data class GtfsStopSuggestion(
@@ -282,6 +283,8 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val matatuRepository = remember(context) { MatatuRepository(context) }
+    val fleetRepository = remember(context) { FleetRepository(context) }
 
     // Permission launcher
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -344,11 +347,18 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
 
     // Fetch fleets for this operator
     LaunchedEffect(operatorId) {
-        FleetRepository.fetchFleetsForOperator(operatorId) { fetchedFleets ->
-            fleets = fetchedFleets
-            isLoading = false
-            if (fleets.isNotEmpty()) {
-                showFleetDialog = true
+        coroutineScope.launch {
+            isLoading = true
+            try {
+                val fetchedFleets = fleetRepository.fetchFleetsForOperator(operatorId)
+                fleets = fetchedFleets
+                if (fleets.isNotEmpty()) {
+                    showFleetDialog = true
+                }
+            } catch (e: Exception) {
+                Log.e("RegistrationScreen", "Error fetching fleets", e)
+            } finally {
+                isLoading = false
             }
         }
     }
@@ -394,6 +404,13 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
         } else {
             showDestinationSuggestions = false
         }
+    }
+
+    // Helper function to convert Bitmap to ByteArray
+    fun bitmapToByteArray(bitmap: Bitmap): ByteArray {
+        val stream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        return stream.toByteArray()
     }
 
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(20.dp)) {
@@ -524,73 +541,70 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
             Button(onClick = {
                 coroutineScope.launch {
                     val stopsCopy = stops.toList()
-                    var registeredMatatuId = ""
+                    val registeredMatatuId = UUID.randomUUID().toString()
                     
-                    // First get a new matatu ID
-                    val database = FirebaseDatabase.getInstance()
-                    val matatuRef = database.getReference("matatus").push()
-                    registeredMatatuId = matatuRef.key ?: return@launch
+                    // Log before registration attempt
+                    Log.d("MatatuRegistration", "Attempting to register matatu with ID: $registeredMatatuId, reg: $regNumber")
                     
-                    MatatuRepository.registerMatatu(
+                    val success = matatuRepository.registerMatatu(
                         matatuId = registeredMatatuId,
                         operatorId = operatorId,
                         regNumber = regNumber,
                         routeStart = routeStart,
                         routeEnd = routeEnd,
-                        stops = stops,
+                        stops = stopsCopy,
                         mpesaType = mpesaType,
                         pochiNumber = pochiNumber,
                         paybillNumber = paybillNumber,
                         accountNumber = accountNumber,
                         tillNumber = tillNumber,
                         sendMoneyPhone = sendMoneyPhone,
-                        fleetId = selectedFleet?.fleetId ?: ""
-                    ) { success ->
-                        if (success) {
-                            // Generate and save QR code
-                            try {
-                                val multiFormatWriter = MultiFormatWriter()
-                                val bitMatrix: BitMatrix = multiFormatWriter.encode(
-                                    registeredMatatuId,
-                                    BarcodeFormat.QR_CODE,
-                                    500,
-                                    500
-                                )
-                                val barcodeEncoder = BarcodeEncoder()
-                                val qrBitmap = barcodeEncoder.createBitmap(bitMatrix)
+                        fleetname = selectedFleet?.fleetName ?: ""
+                    )
+                    
+                    // Log after registration attempt
+                    Log.d("MatatuRegistration", "Registration result: $success for ID: $registeredMatatuId, reg: $regNumber")
+                    
+                    if (success) {
+                        // Verify matatu was saved by trying to read it back
+                        val savedMatatu = matatuRepository.getMatatuByRegistration(regNumber)
+                        Log.d("MatatuRegistration", "Verification - Found in database: ${savedMatatu != null}, ID: ${savedMatatu?.matatuId}")
+                        
+                        // Generate and save QR code
+                        try {
+                            val multiFormatWriter = MultiFormatWriter()
+                            val bitMatrix: BitMatrix = multiFormatWriter.encode(
+                                regNumber, // Use registration number for QR code instead of UUID
+                                BarcodeFormat.QR_CODE,
+                                500,
+                                500
+                            )
+                            val barcodeEncoder = BarcodeEncoder()
+                            val qrBitmap = barcodeEncoder.createBitmap(bitMatrix)
 
-                                // Save QR code to gallery
-                                saveQRCodeToGallery(qrBitmap, registeredMatatuId)
+                            // Save QR code to gallery
+                            saveQRCodeToGallery(qrBitmap, regNumber)
 
-                                // Upload QR code to Firebase Storage
-                                val storage = FirebaseStorage.getInstance()
-                                val qrRef = storage.reference.child("qr_codes/${regNumber}.png")
-                                val baos = ByteArrayOutputStream()
-                                qrBitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
-                                val data = baos.toByteArray()
-
-                                qrRef.putBytes(data)
-                                    .addOnSuccessListener {
-                                        Toast.makeText(context, "Registration Successful!", Toast.LENGTH_LONG).show()
-                                        navController.navigate(Routes.operatorHomeRoute(operatorId)) {
-                                            popUpTo(Routes.OperatorHome) { inclusive = true }
-                                        }
-                                    }
-                                    .addOnFailureListener { e ->
-                                        Toast.makeText(context, "Registration successful but failed to save QR code: ${e.message}", Toast.LENGTH_LONG).show()
-                                        navController.navigate(Routes.operatorHomeRoute(operatorId)) {
-                                            popUpTo(Routes.OperatorHome) { inclusive = true }
-                                        }
-                                    }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Registration successful but failed to generate QR code: ${e.message}", Toast.LENGTH_LONG).show()
-                                navController.navigate(Routes.operatorHomeRoute(operatorId)) {
-                                    popUpTo(Routes.OperatorHome) { inclusive = true }
-                                }
+                            // Save QR code to SQLite using QrCodeDao
+                            val appDatabase = AppDatabase.getDatabase(context)
+                            val qrCodeDao = appDatabase.qrCodeDao()
+                            val qrCodeEntity = QrCode(
+                                registrationNumber = regNumber,
+                                qrImage = bitmapToByteArray(qrBitmap)
+                            )
+                            qrCodeDao.insertQrCode(qrCodeEntity)
+                            Toast.makeText(context, "Registration Successful! QR Code saved locally.", Toast.LENGTH_LONG).show()
+                            navController.navigate(Routes.operatorHomeRoute(operatorId)) {
+                                popUpTo(Routes.OperatorHome) { inclusive = true }
                             }
-                        } else {
-                            Toast.makeText(context, "Registration Failed!", Toast.LENGTH_LONG).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Registration successful but failed to generate QR code: ${e.message}", Toast.LENGTH_LONG).show()
+                            navController.navigate(Routes.operatorHomeRoute(operatorId)) {
+                                popUpTo(Routes.OperatorHome) { inclusive = true }
+                            }
                         }
+                    } else {
+                        Toast.makeText(context, "Registration Failed!", Toast.LENGTH_LONG).show()
                     }
                 }
             }) {

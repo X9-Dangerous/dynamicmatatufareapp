@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -18,6 +19,8 @@ fun FleetRegistrationScreen(navController: NavController, operatorId: String) {
     var fleetName by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val fleetRepository = remember(context) { FleetRepository(context) }
 
     Column(
         modifier = Modifier.fillMaxSize().statusBarsPadding().padding(20.dp),
@@ -40,7 +43,7 @@ fun FleetRegistrationScreen(navController: NavController, operatorId: String) {
                 errorMessage = "Please enter a fleet name."
             } else {
                 coroutineScope.launch {
-                    val fleetId = FleetRepository.registerFleet(
+                    val fleetId = fleetRepository.registerFleet(
                         fleetName = fleetName,
                         operatorId = operatorId
                     )
