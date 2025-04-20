@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -153,17 +154,19 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                 // Check peak hours
                 val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
                 val isPeakTime = hour in 6..9 || hour in 16..20
-                weatherManager.fetchWeather { isRaining ->
-                    estimatedFare = fareEstimator.estimateFare(
-                        startLat = start.latitude,
-                        startLon = start.longitude,
-                        endLat = end.latitude,
-                        endLon = end.longitude,
-                        isRainyWeather = isRaining,
-                        isPeakHour = isPeakTime,
-                        routeDistance = routeDistance?.div(1000.0) ?: 0.0  // Convert to km here for fare calculation
-                    )
+                var isRaining = false
+                weatherManager.fetchWeather { isRainy ->
+                    isRaining = isRainy
                 }
+                estimatedFare = fareEstimator.estimateFare(
+                    startLat = start.latitude,
+                    startLon = start.longitude,
+                    endLat = end.latitude,
+                    endLon = end.longitude,
+                    isRainyWeather = isRaining,
+                    isPeakHour = isPeakTime,
+                    routeDistance = routeDistance?.div(1000.0) ?: 0.0  // Convert to km here for fare calculation
+                )
             } catch (e: Exception) {
                 Log.e("FARE_ESTIMATE", "Error estimating fare: ${e.message}")
             }
@@ -513,7 +516,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                     Toast.makeText(context, "Please enter starting point and destination", Toast.LENGTH_SHORT).show()
                 }
             })
-        }
+        )
 
         Spacer(modifier = Modifier.height(10.dp))
 
