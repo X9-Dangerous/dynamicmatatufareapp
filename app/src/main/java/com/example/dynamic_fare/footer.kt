@@ -27,7 +27,7 @@ import com.google.firebase.database.FirebaseDatabase
 @Composable
 fun FooterWithIcons(
     navController: NavController,
-    userId: String = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    userId: String = FirebaseAuth.getInstance().currentUser?.email ?: ""
 ) {
     Log.d("FooterWithIcons", "Footer loaded with userId: $userId")
     Column(modifier = Modifier.fillMaxSize()) {
@@ -61,11 +61,10 @@ fun FooterWithIcons(
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
-                        // Get current user ID from Firebase Auth
-                        val userId = FirebaseAuth.getInstance().currentUser?.uid
-                        if (userId != null) {
-                            Log.d("FooterWithIcons", "Navigating to notifications with userId: $userId")
-                            navController.navigate(Routes.notificationsRoute(userId)) {
+                        val emailUserId = FirebaseAuth.getInstance().currentUser?.email
+                        if (emailUserId != null) {
+                            Log.d("FooterWithIcons", "Navigating to notifications with userId: $emailUserId")
+                            navController.navigate(Routes.notificationsRoute(emailUserId)) {
                                 launchSingleTop = true
                             }
                         }
@@ -93,29 +92,28 @@ fun FooterWithIcons(
                     .size(32.dp)
                     .clickable {
                         try {
-                            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-                            if (currentUserId != null) {
+                            val emailUserId = FirebaseAuth.getInstance().currentUser?.email
+                            if (emailUserId != null) {
                                 // First ensure settings exist
                                 FirebaseDatabase.getInstance()
                                     .getReference("userSettings")
-                                    .child(currentUserId)
+                                    .child(emailUserId.replace(".", ","))
                                     .get()
                                     .addOnSuccessListener { snapshot ->
                                         if (!snapshot.exists()) {
-                                            // Initialize settings if they don't exist
                                             val initialSettings = mapOf(
-                                                "userId" to currentUserId,
+                                                "userId" to emailUserId,
                                                 "isDisabled" to false,
                                                 "notificationsEnabled" to true,
                                                 "lastUpdated" to System.currentTimeMillis()
                                             )
                                             FirebaseDatabase.getInstance()
                                                 .getReference("userSettings")
-                                                .child(currentUserId)
+                                                .child(emailUserId.replace(".", ","))
                                                 .setValue(initialSettings)
                                         }
-                                        Log.d("FooterWithIcons", "Navigating to accessibility settings with userId: $currentUserId")
-                                        navController.navigate(Routes.accessibilitySettingsRoute(currentUserId)) {
+                                        Log.d("FooterWithIcons", "Navigating to accessibility settings with userId: $emailUserId")
+                                        navController.navigate(Routes.accessibilitySettingsRoute(emailUserId)) {
                                             launchSingleTop = true
                                         }
                                     }

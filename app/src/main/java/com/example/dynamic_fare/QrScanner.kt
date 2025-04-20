@@ -127,7 +127,8 @@ fun QRScannerScreen(
                                     // If you want to keep using the DB query, you could also update your schema/query for case-insensitive matching
                                     if (matatu != null) {
                                         android.util.Log.d("QRScanner", "Found matatu: ${matatu.registrationNumber}, ID: ${matatu.matatuId}")
-                                        navController.navigate(com.example.dynamic_fare.Routes.paymentPageWithQRCode(matatu.registrationNumber, userId)) {
+                                        val userEmail = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: userId
+                                        navController.navigate(com.example.dynamic_fare.Routes.paymentPageWithQRCode(matatu.registrationNumber, userEmail)) {
                                             popUpTo(com.example.dynamic_fare.Routes.QRScannerScreen) { inclusive = true }
                                         }
                                     } else {

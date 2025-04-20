@@ -33,6 +33,10 @@ fun PaymentPage(
     onPaymentSuccess: () -> Unit = {},
     userId: String
 ) {
+    // In PaymentPage, userId is now always the user's email.
+    // Make sure all lookups and references use userId as email.
+    // If there is any place where userId is assumed to be a UID, update the logic to treat it as an email.
+    // Example: SqliteUserRepository.getUserByEmail(userId)
     android.util.Log.d("PaymentPage", "PaymentPage Composable invoked")
     val context = LocalContext.current
     var registrationNumber by remember { mutableStateOf<String?>(null) }
@@ -127,27 +131,30 @@ fun PaymentPage(
                 "pochi la biashara" -> {
                     mpesaDetails = mapOf(
                         "pochiNumber" to (matatu.pochiNumber ?: ""),
-                        "phoneNumber" to phoneNumber
+                        "phoneNumber" to formatPhoneNumber(phoneNumber)
                     )
                 }
                 "paybill" -> {
                     mpesaDetails = mapOf(
                         "paybillNumber" to (matatu.paybillNumber ?: ""),
                         "accountNumber" to (matatu.accountNumber ?: ""),
-                        "phoneNumber" to phoneNumber
+                        "phoneNumber" to formatPhoneNumber(phoneNumber)
                     )
                 }
                 "till number" -> {
                     mpesaDetails = mapOf(
                         "tillNumber" to (matatu.tillNumber ?: ""),
-                        "phoneNumber" to phoneNumber
+                        "phoneNumber" to formatPhoneNumber(phoneNumber)
                     )
                 }
                 "send money" -> {
                     mpesaDetails = mapOf(
-                        "phoneNumber" to phoneNumber,
-                        "sendMoneyPhone" to (matatu.sendMoneyPhone ?: "")
+                        "phoneNumber" to formatPhoneNumber(phoneNumber),
+                        "sendMoneyPhone" to formatPhoneNumber(matatu.sendMoneyPhone ?: "")
                     )
+                }
+                else -> {
+                    mpesaDetails = mapOf("phoneNumber" to formatPhoneNumber(phoneNumber))
                 }
             }
 
@@ -361,18 +368,14 @@ fun PaymentPage(
                         return@Button
                     }
 
-                    // Update mpesaDetails with current phone number
-                    android.util.Log.d("Payment", "Current phone number before payment: $phoneNumber")
-                    val updatedMpesaDetails = mpesaDetails + ("phoneNumber" to phoneNumber)
-
-                    android.util.Log.d("Payment", "Making payment with details: $updatedMpesaDetails")
+                    android.util.Log.d("Payment", "Making payment with details: $mpesaDetails")
 
                     MpesaPaymentHandler.initiatePayment(
                         context = context,
                         registrationNumber = registrationNumber!!,
                         amount = validFare,
                         mpesaOption = mpesaOption!!,
-                        mpesaDetails = updatedMpesaDetails
+                        mpesaDetails = mpesaDetails
                     ) { success, message ->
                         isLoading = false
                         paymentStatus = message
