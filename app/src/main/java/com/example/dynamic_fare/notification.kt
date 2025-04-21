@@ -17,13 +17,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import com.google.firebase.database.FirebaseDatabase
-
+import com.example.dynamic_fare.PaymentRepository
 import com.example.dynamic_fare.models.Payment
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 fun PaymentDetailsDialog(
@@ -84,36 +86,14 @@ fun PaymentHistoryScreen(navController: NavController, userId: String) {
     var error by remember { mutableStateOf<String?>(null) }
     var selectedPayment by remember { mutableStateOf<Payment?>(null) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(userId) {
-        val database = FirebaseDatabase.getInstance().getReference("payments")
-        database.orderByChild("userId").equalTo(userId).get()
-            .addOnSuccessListener { snapshot ->
-                val paymentsList = mutableListOf<Payment>()
-                snapshot.children.forEach { child ->
-                    val payment = Payment(
-                        id = child.key ?: "",
-                        userId = child.child("userId").getValue(String::class.java) ?: "",
-                        amount = child.child("amount").getValue(Double::class.java) ?: 0.0,
-                        route = child.child("route").getValue(String::class.java) ?: "",
-                        timestamp = child.child("timestamp").getValue(Long::class.java) ?: 0L,
-                        status = child.child("status").getValue(String::class.java) ?: "completed",
-                        startLocation = child.child("startLocation").getValue(String::class.java) ?: "",
-                        endLocation = child.child("endLocation").getValue(String::class.java) ?: "",
-                        matatuRegistration = child.child("matatuRegistration").getValue(String::class.java) ?: "",
-                        mpesaReceiptNumber = child.child("mpesaReceiptNumber").getValue(String::class.java) ?: "",
-                        paymentMethod = child.child("paymentMethod").getValue(String::class.java) ?: "",
-                        phoneNumber = child.child("phoneNumber").getValue(String::class.java) ?: ""
-                    )
-                    paymentsList.add(payment)
-                }
-                payments = paymentsList.sortedByDescending { it.timestamp }
-                isLoading = false
-            }
-            .addOnFailureListener { e ->
-                error = e.message
-                isLoading = false
-            }
+        // Fetch from local SQLite instead of Firebase
+        val paymentRepo = PaymentRepository(context)
+        payments = paymentRepo.getPaymentsForUser(userId)
+        isLoading = false
     }
 
     Scaffold(
@@ -191,19 +171,13 @@ fun PaymentHistoryScreen(navController: NavController, userId: String) {
             confirmButton = {
                 TextButton(
                     onClick = {
-                        // Delete from Firebase
-                        val database = FirebaseDatabase.getInstance().getReference("payments")
-                        database.child(selectedPayment!!.id).removeValue()
-                            .addOnSuccessListener {
-                                // Remove from local list
-                                payments = payments.filter { it.id != selectedPayment!!.id }
-                                showDeleteConfirmation = false
-                                selectedPayment = null
-                            }
-                            .addOnFailureListener { e ->
-                                // Show error message
-                                error = "Failed to delete payment: ${e.message}"
-                            }
+                        coroutineScope.launch {
+                            val paymentRepo = PaymentRepository(context)
+                            paymentRepo.deletePayment(selectedPayment!!.id)
+                            payments = payments.filter { it.id != selectedPayment!!.id }
+                            showDeleteConfirmation = false
+                            selectedPayment = null
+                        }
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
                 ) {
@@ -217,9 +191,7 @@ fun PaymentHistoryScreen(navController: NavController, userId: String) {
             }
         )
     }
-            }
-
-
+}
 
 @Composable
 fun PaymentHistoryCard(payment: Payment, onClick: () -> Unit) {

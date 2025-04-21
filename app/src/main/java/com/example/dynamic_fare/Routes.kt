@@ -122,11 +122,6 @@ fun AppNavigation(
         composable(Routes.MatatuDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) {
                 backStackEntry -> MatatuDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
         }
-        composable(Routes.FleetAndFareTabs, arguments = listOf(navArgument("fleetId") { type = NavType.StringType })) {
-                backStackEntry ->
-            val fleetId = backStackEntry.arguments?.getString("fleetId") ?: ""
-            FleetAndFareTabs(navController, fleetId)
-        }
         composable(
             Routes.PaymentPage,
             arguments = listOf(
@@ -160,7 +155,7 @@ fun AppNavigation(
             )
         }
         composable(Routes.FareDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) {
-                backStackEntry -> FareDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
+            backStackEntry -> FareDetailsScreen(backStackEntry.arguments?.getString("matatuId") ?: "")
         }
 
         composable(

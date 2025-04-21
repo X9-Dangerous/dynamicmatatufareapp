@@ -94,9 +94,6 @@ class MainActivity : ComponentActivity() {
                         MatatuDetailsScreen(navController = navController, matatuId = matatuId)
                     }
 
-                    composable(Routes.FareDetailsScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) { backStackEntry ->
-                        FareDetailsScreen(navController, backStackEntry.arguments?.getString("matatuId") ?: "")
-                    }
 
                     composable(Routes.SetFaresScreen, arguments = listOf(navArgument("matatuId") { type = NavType.StringType })) { backStackEntry ->
                         val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
@@ -165,7 +162,10 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("fleetId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val fleetId = backStackEntry.arguments?.getString("fleetId") ?: ""
-                        FleetDetailsScreen(navController = navController, fleetId = fleetId)
+                        FleetDetailsScreen(
+
+                            navController = navController,fleetId = fleetId,
+                        )
                     }
 
                     composable(

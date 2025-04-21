@@ -91,40 +91,14 @@ fun FooterWithIcons(
                 modifier = Modifier
                     .size(32.dp)
                     .clickable {
-                        try {
-                            val emailUserId = FirebaseAuth.getInstance().currentUser?.email
-                            if (emailUserId != null) {
-                                // First ensure settings exist
-                                FirebaseDatabase.getInstance()
-                                    .getReference("userSettings")
-                                    .child(emailUserId.replace(".", ","))
-                                    .get()
-                                    .addOnSuccessListener { snapshot ->
-                                        if (!snapshot.exists()) {
-                                            val initialSettings = mapOf(
-                                                "userId" to emailUserId,
-                                                "isDisabled" to false,
-                                                "notificationsEnabled" to true,
-                                                "lastUpdated" to System.currentTimeMillis()
-                                            )
-                                            FirebaseDatabase.getInstance()
-                                                .getReference("userSettings")
-                                                .child(emailUserId.replace(".", ","))
-                                                .setValue(initialSettings)
-                                        }
-                                        Log.d("FooterWithIcons", "Navigating to accessibility settings with userId: $emailUserId")
-                                        navController.navigate(Routes.accessibilitySettingsRoute(emailUserId)) {
-                                            launchSingleTop = true
-                                        }
-                                    }
-                                    .addOnFailureListener { e ->
-                                        Log.e("Footer", "Error checking settings: ${e.message}")
-                                    }
-                            } else {
-                                Log.e("Footer", "No user logged in")
+                        val emailUserId = FirebaseAuth.getInstance().currentUser?.email
+                        if (emailUserId != null) {
+                            Log.d("FooterWithIcons", "Navigating to accessibility settings with userId: $emailUserId")
+                            navController.navigate(Routes.accessibilitySettingsRoute(emailUserId)) {
+                                launchSingleTop = true
                             }
-                        } catch (e: Exception) {
-                            Log.e("Footer", "Error navigating to settings: ${e.message}")
+                        } else {
+                            Log.e("Footer", "No user logged in")
                         }
                     }
             )

@@ -8,8 +8,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
-import com.google.firebase.database.FirebaseDatabase
+import com.example.dynamic_fare.UserSettingsRepository
 
 data class UserAccessibilitySettings(
     val userId: String = "",
@@ -21,63 +22,24 @@ data class UserAccessibilitySettings(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccessibilitySettingsScreen(navController: NavController, userId: String) {
+    val context = LocalContext.current
     var userSettings by remember { mutableStateOf(UserAccessibilitySettings(userId = userId)) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-    
-    // Keep track of the latest Firebase value
-    var firebaseDisabledState by remember { mutableStateOf(false) }
 
-    // Load user settings
-    // Set up real-time listener for changes
+    // Load user settings from SQLite
     LaunchedEffect(userId) {
-        val database = FirebaseDatabase.getInstance().getReference("userSettings")
-        val userRef = database.child(userId)
-
-        // Initial load
-        userRef.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val isDisabled = snapshot.child("isDisabled").getValue(Boolean::class.java) ?: false
-                val notificationsEnabled = snapshot.child("notificationsEnabled").getValue(Boolean::class.java) ?: true
-                firebaseDisabledState = isDisabled
-                userSettings = UserAccessibilitySettings(
-                    userId = userId,
-                    isDisabled = isDisabled,
-                    notificationsEnabled = notificationsEnabled,
-                    lastUpdated = snapshot.child("lastUpdated").getValue(Long::class.java) ?: System.currentTimeMillis()
-                )
-            } else {
-                // Initialize settings if they don't exist
-                val initialSettings = UserAccessibilitySettings(userId = userId)
-                userRef.setValue(initialSettings)
-                    .addOnSuccessListener {
-                        userSettings = initialSettings
-                        firebaseDisabledState = false
-                    }
-                    .addOnFailureListener { e ->
-                        error = "Failed to initialize settings: ${e.message}"
-                    }
-            }
-            isLoading = false
-        }.addOnFailureListener { e ->
-            error = "Error loading settings: ${e.message}"
-            isLoading = false
+        val repo = UserSettingsRepository(context)
+        val loaded = repo.getUserSettings(userId)
+        if (loaded != null) {
+            userSettings = loaded
+        } else {
+            // If not found, initialize
+            val initial = UserAccessibilitySettings(userId = userId)
+            repo.saveUserSettings(initial)
+            userSettings = initial
         }
-
-        // Set up real-time listener
-        userRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                if (snapshot.exists()) {
-                    val isDisabled = snapshot.child("isDisabled").getValue(Boolean::class.java) ?: false
-                    firebaseDisabledState = isDisabled
-                    userSettings = userSettings.copy(isDisabled = isDisabled)
-                }
-            }
-
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                android.util.Log.e("AccessibilitySettings", "Database error: ${error.message}")
-            }
-        })
+        isLoading = false
     }
 
     Scaffold(
@@ -115,22 +77,11 @@ fun AccessibilitySettingsScreen(navController: NavController, userId: String) {
                 ) {
                     Text("Disability Status")
                     Switch(
-                        checked = firebaseDisabledState,
+                        checked = userSettings.isDisabled,
                         onCheckedChange = { isDisabled ->
-                            // Update local state immediately for UI responsiveness
-                            firebaseDisabledState = isDisabled
-                            
-                            // Update in Database
-                            FirebaseDatabase.getInstance()
-                                .getReference("userSettings")
-                                .child(userId)
-                                .child("isDisabled")
-                                .setValue(isDisabled)
-                                .addOnFailureListener { e ->
-                                    // Revert local state if update fails
-                                    firebaseDisabledState = !isDisabled
-                                    error = "Failed to update: ${e.message}"
-                                }
+                            userSettings = userSettings.copy(isDisabled = isDisabled, lastUpdated = System.currentTimeMillis())
+                            val repo = UserSettingsRepository(context)
+                            repo.saveUserSettings(userSettings)
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
@@ -154,12 +105,9 @@ fun AccessibilitySettingsScreen(navController: NavController, userId: String) {
                     Switch(
                         checked = userSettings.notificationsEnabled,
                         onCheckedChange = { enabled ->
-                            userSettings = userSettings.copy(notificationsEnabled = enabled)
-                            // Update in Database
-                            FirebaseDatabase.getInstance()
-                                .getReference("userSettings")
-                                .child(userId)
-                                .setValue(userSettings)
+                            userSettings = userSettings.copy(notificationsEnabled = enabled, lastUpdated = System.currentTimeMillis())
+                            val repo = UserSettingsRepository(context)
+                            repo.saveUserSettings(userSettings)
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,

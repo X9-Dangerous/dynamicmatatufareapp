@@ -9,6 +9,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.dynamic_fare.data.FleetRepository
+import com.example.dynamic_fare.data.MatatuRepository
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.DataSnapshot
@@ -18,78 +21,23 @@ import com.google.firebase.database.ktx.getValue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FleetAndFareTabs(navController: NavController, fleetId: String) {
-    var selectedTab by rememberSaveable { mutableStateOf(0) } // Ensure state persists across recompositions
-    val tabTitles = listOf("Fleet Details", "Fare Details")
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = selectedTab) {
-            tabTitles.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = {
-                        selectedTab = index
-                        println("🔄 Tab changed to: $index") // Debugging tab switch
-                    },
-                    text = { Text(title) }
-                )
-            }
-        }
-
-        // Debugging Output
-        println("🚀 Currently Selected Tab: $selectedTab")
-
-        when (selectedTab) {
-            0 -> {
-                println("🟢 Loading Fleet Details") // Debugging
-                FleetDetailsScreen(navController, fleetId)
-            }
-            1 -> {
-                println("🟢 Loading Fare Details") // Debugging
-                FareDetailsScreen(navController, fleetId)
-            }
-        }
-    }
-}
-
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun FleetDetailsScreen(navController: NavController, fleetId: String) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var fleetName by remember { mutableStateOf("") }
     var matatuCount by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
 
-    val fleetRef = remember { FirebaseDatabase.getInstance().reference.child("fleets").child(fleetId) }
-    val matatuRef = remember { FirebaseDatabase.getInstance().reference.child("matatus") }
-
     LaunchedEffect(fleetId) {
-        // Get fleet details
-        fleetRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    fleetName = snapshot.child("fleetName").getValue(String::class.java) ?: ""
-                }
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                println("Error fetching fleet details")
-            }
-        })
-
-        // Count matatus in this fleet by fleetId
-        matatuRef.orderByChild("fleetId").equalTo(fleetId)
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    matatuCount = snapshot.childrenCount.toInt()
-                    isLoading = false
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    println("Error counting matatus")
-                    isLoading = false
-                }
-            })
+        coroutineScope.launch {
+            val fleetRepo = FleetRepository(context)
+            val matatuRepo = MatatuRepository(context)
+            val fleet = fleetRepo.fetchFleetDetails(fleetId)
+            fleetName = fleet?.fleetName ?: ""
+            val allMatatus = matatuRepo.getAllMatatus()
+            matatuCount = allMatatus.count { it.fleetname == fleetName }
+            isLoading = false
+        }
     }
 
     Scaffold(
@@ -111,61 +59,6 @@ fun FleetDetailsScreen(navController: NavController, fleetId: String) {
                     Text("Fleet ID: $fleetId", style = MaterialTheme.typography.bodyLarge)
                     Text("Fleet Name: $fleetName", style = MaterialTheme.typography.bodyMedium)
                     Text("Number of Matatus: $matatuCount", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
-    }
-}
-
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FareDetailsScreen(navController: NavController, fleetId: String) {
-    var fareDetails by remember { mutableStateOf<Map<String, String>?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
-
-    val faresRef = remember { FirebaseDatabase.getInstance().reference.child("fares").child(fleetId) }
-
-    LaunchedEffect(fleetId) {
-        faresRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    fareDetails = snapshot.children.associate { it.key!! to it.value.toString() }
-                }
-                isLoading = false
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                isLoading = false
-            }
-        })
-    }
-
-    Scaffold(
-        topBar = { CenterAlignedTopAppBar(title = { Text("Fare Details") }) }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator()
-            } else if (fareDetails != null) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Peak Hours Fare: ${fareDetails?.get("peak_hours")}", style = MaterialTheme.typography.bodyLarge)
-                    Text("Non-Peak Hours Fare: ${fareDetails?.get("non_peak_hours")}", style = MaterialTheme.typography.bodyLarge)
-                    Text("Fare When Raining: ${fareDetails?.get("raining_fare")}", style = MaterialTheme.typography.bodyLarge)
-                    Text("Fare When Not Raining: ${fareDetails?.get("non_raining_fare")}", style = MaterialTheme.typography.bodyLarge)
-                }
-            } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No fare details found. Please register fares.", style = MaterialTheme.typography.bodyLarge)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { navController.navigate("setFares") }) {
-                        Text("Register Fares")
-                    }
                 }
             }
         }

@@ -19,6 +19,7 @@ import com.example.dynamic_fare.auth.SqliteUserRepository
 import com.example.dynamic_fare.data.FareRepository
 import com.example.dynamic_fare.data.FleetRepository
 import com.example.dynamic_fare.data.MatatuRepository
+import com.example.dynamic_fare.PaymentRepository
 import com.example.dynamic_fare.models.MatatuFares
 import com.example.dynamic_fare.models.Payment
 
@@ -33,10 +34,7 @@ fun PaymentPage(
     onPaymentSuccess: () -> Unit = {},
     userId: String
 ) {
-    // In PaymentPage, userId is now always the user's email.
-    // Make sure all lookups and references use userId as email.
-    // If there is any place where userId is assumed to be a UID, update the logic to treat it as an email.
-    // Example: SqliteUserRepository.getUserByEmail(userId)
+
     android.util.Log.d("PaymentPage", "PaymentPage Composable invoked")
     val context = LocalContext.current
     var registrationNumber by remember { mutableStateOf<String?>(null) }
@@ -70,6 +68,10 @@ fun PaymentPage(
             phoneNumber = ""
             isPhoneLoaded = false
         }
+        // Fetch disability status from SQLite and set isDisabled
+        val userSettingsRepo = com.example.dynamic_fare.UserSettingsRepository(context)
+        val userSettings = userSettingsRepo.getUserSettings(userId)
+        isDisabled = userSettings?.isDisabled ?: false
     }
 
     // Fetch matatu details and fleet information from SQLite
@@ -383,7 +385,7 @@ fun PaymentPage(
                         if (success) {
                             // Save payment to history
                             val payment = Payment(
-                                id = "",
+                                id = java.util.UUID.randomUUID().toString(),
                                 userId = userId,
                                 amount = validFare.toDouble(),
                                 route = scannedQRCode,
@@ -397,8 +399,10 @@ fun PaymentPage(
                                 phoneNumber = phoneNumber
                             )
 
-                            // TODO: Implement saving payment to local SQLite database
-                            android.util.Log.d("Payment", "Payment saved to history")
+                            // Save payment to local SQLite database
+                            val paymentRepo = PaymentRepository(context)
+                            paymentRepo.insertPayment(payment)
+                            android.util.Log.d("Payment", "Payment saved to history (SQLite)")
                             // Update dialog state instead of showing dialog directly
                             successAmount = validFare.toString()
                             successMessage = message
