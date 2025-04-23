@@ -883,7 +883,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Pay Button
         Button(
