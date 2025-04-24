@@ -26,6 +26,10 @@ class SqliteUserRepository(private val context: Context) {
         userDao.getUserByEmail(email)
     }
 
+    suspend fun getAllUsers(): List<User> = withContext(Dispatchers.IO) {
+        userDao.getAllUsers()
+    }
+
     suspend fun updatePasswordByEmail(email: String, newPassword: String) = withContext(Dispatchers.IO) {
         userDao.updatePasswordByEmail(email, newPassword)
     }

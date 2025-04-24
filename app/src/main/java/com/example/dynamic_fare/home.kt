@@ -45,6 +45,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.example.dynamic_fare.auth.SqliteUserRepository
 import com.google.android.gms.location.*
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
@@ -64,6 +65,9 @@ import java.text.DecimalFormat
 @Composable
 fun MatatuEstimateScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
+    val userRepository = remember { SqliteUserRepository(context) }
+    val coroutineScope = rememberCoroutineScope()
+    var currentUserEmail by remember { mutableStateOf<String?>(null) }
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var destinationLocation by remember { mutableStateOf<GeoPoint?>(null) }
@@ -88,6 +92,24 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
     var routeDistance by remember { mutableStateOf<Double?>(null) }
     var routeDuration by remember { mutableStateOf<Double?>(null) }
     var routeDirections by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    // Fetch current user email when screen loads
+    LaunchedEffect(Unit) {
+        coroutineScope.launch {
+            try {
+                // Get the current user from SQLite
+                val users = userRepository.getUserByEmail(currentUserEmail ?: "")
+                if (users != null) {
+                    currentUserEmail = users.email
+                    Log.d("MatatuEstimateScreen", "Found current user email: $currentUserEmail")
+                } else {
+                    Log.e("MatatuEstimateScreen", "No user found in SQLite database")
+                }
+            } catch (e: Exception) {
+                Log.e("MatatuEstimateScreen", "Error fetching user: ${e.message}")
+            }
+        }
+    }
 
     // Preload GTFS data when the screen is first shown
     LaunchedEffect(Unit) {
@@ -132,7 +154,6 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
         }
     }
     var estimatedFare by remember { mutableStateOf<EstimatedFare?>(null) }
-    val scope = rememberCoroutineScope()
 
     fun fetchRoute(start: GeoPoint, end: GeoPoint) {
         Log.d("ROUTE_FETCH", "Fetching route from ${start.latitude},${start.longitude} to ${end.latitude},${end.longitude}")
@@ -148,7 +169,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
         routeDuration = directDistanceInMeters / (40.0 * 1000.0 / 3600.0) // 40 km/h converted to m/s
 
         // Get fare estimate
-        scope.launch {
+        coroutineScope.launch {
             try {
                 val weatherManager = WeatherManager()
                 // Check peak hours
@@ -883,7 +904,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Pay Button
         Button(
@@ -911,7 +932,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                 .padding(vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {
-            FooterWithIcons(navController)
+            FooterWithIcons(navController, currentUserEmail ?: "")
         }
     }
 }

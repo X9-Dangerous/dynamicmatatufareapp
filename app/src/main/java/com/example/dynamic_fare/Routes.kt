@@ -38,7 +38,7 @@ object Routes {
     const val ClientProfileScreen = "clientProfile/{userId}"
     const val SetNewPasswordScreen = "setNewPassword/{email}"
 
-    fun matatuEstimateRoute(): String = "clientHome"
+    fun matatuEstimateRoute(userId: String): String = "clientHome/ $userId"
     fun operatorHomeRoute(operatorId: String): String = "operatorHomeScreen/$operatorId"
     fun homeRoute(userId: String): String = "home/$userId"
     fun qrScannerRoute(userId: String): String = "qrScanner/$userId"

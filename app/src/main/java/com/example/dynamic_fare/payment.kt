@@ -210,8 +210,8 @@ fun PaymentPage(
             onDismissRequest = {
                 showSuccessDialog = false
                 onPaymentSuccess()
-                navController.navigate(Routes.matatuEstimateRoute()) {
-                    popUpTo(Routes.matatuEstimateRoute()) { inclusive = true }
+                navController.navigate(Routes.matatuEstimateRoute(userId)) {
+                    popUpTo(Routes.matatuEstimateRoute(userId)) { inclusive = true }
                 }
             },
             title = { Text("Payment Successful") },
@@ -221,8 +221,8 @@ fun PaymentPage(
                     onClick = {
                         showSuccessDialog = false
                         onPaymentSuccess()
-                        navController.navigate(Routes.matatuEstimateRoute()) {
-                            popUpTo(Routes.matatuEstimateRoute()) { inclusive = true }
+                        navController.navigate(Routes.matatuEstimateRoute(userId)) {
+                            popUpTo(Routes.matatuEstimateRoute(userId)) { inclusive = true }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B51F5))
