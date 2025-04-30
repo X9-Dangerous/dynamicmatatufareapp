@@ -35,6 +35,7 @@ import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.dynamic_fare.R
 import com.example.dynamic_fare.auth.SqliteUserRepository
+import com.example.dynamic_fare.datastore.UserSessionDataStore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 
@@ -179,8 +180,11 @@ fun ClientProfileScreen(navController: NavController, userId: String) {
         // Logout Button
         Button(
             onClick = {
-                navController.navigate("login") {
-                    popUpTo("clientHome") { inclusive = true }
+                coroutineScope.launch {
+                    UserSessionDataStore.clearUserEmail(context)
+                    navController.navigate("login") {
+                        popUpTo("clientHome") { inclusive = true }
+                    }
                 }
             },
             colors = ButtonDefaults.buttonColors(

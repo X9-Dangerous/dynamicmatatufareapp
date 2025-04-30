@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import android.widget.Toast
 import android.util.Log
+import com.example.dynamic_fare.datastore.UserSessionDataStore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,9 +126,11 @@ fun ProfileScreen(navController: NavController, userId: String) {
                         Spacer(modifier = Modifier.height(32.dp))
                         Button(
                             onClick = {
-                                // Navigate to login and clear the back stack
-                                navController.navigate("login") {
-                                    popUpTo("profile") { inclusive = true }
+                                coroutineScope.launch {
+                                    UserSessionDataStore.clearUserEmail(context)
+                                    navController.navigate(Routes.LoginScreenContent) {
+                                        popUpTo(0)
+                                    }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(

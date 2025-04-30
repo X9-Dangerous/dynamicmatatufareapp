@@ -370,45 +370,49 @@ fun PaymentPage(
                         return@Button
                     }
 
-                    android.util.Log.d("Payment", "Making payment with details: $mpesaDetails")
+                    val detailsWithPhone = mpesaDetails.toMutableMap().apply {
+                        put("phoneNumber", formatPhoneNumber(phoneNumber))
+                    }
+                    android.util.Log.d("Payment", "Making payment with details: $detailsWithPhone")
 
                     MpesaPaymentHandler.initiatePayment(
                         context = context,
                         registrationNumber = registrationNumber!!,
                         amount = validFare,
                         mpesaOption = mpesaOption!!,
-                        mpesaDetails = mpesaDetails
-                    ) { success, message ->
-                        isLoading = false
-                        paymentStatus = message
+                        mpesaDetails = detailsWithPhone,
+                        callback = { success, message ->
+                            isLoading = false
+                            paymentStatus = message
 
-                        if (success) {
-                            // Save payment to history
-                            val payment = Payment(
-                                id = java.util.UUID.randomUUID().toString(),
-                                userId = userId,
-                                amount = validFare.toDouble(),
-                                route = scannedQRCode,
-                                timestamp = System.currentTimeMillis(),
-                                status = "completed",
-                                startLocation = "Current Location",  // You can update this with actual locations
-                                endLocation = "Destination",
-                                matatuRegistration = registrationNumber.toString(),
-                                mpesaReceiptNumber = message.substringAfter("Receipt number: ").takeIf { message.contains("Receipt number:") } ?: "",
-                                paymentMethod = mpesaOption.toString(),
-                                phoneNumber = phoneNumber
-                            )
+                            if (success) {
+                                // Save payment to history
+                                val payment = Payment(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    userId = userId,
+                                    amount = validFare.toDouble(),
+                                    route = scannedQRCode,
+                                    timestamp = System.currentTimeMillis(),
+                                    status = "completed",
+                                    startLocation = "Current Location",  // You can update this with actual locations
+                                    endLocation = "Destination",
+                                    matatuRegistration = registrationNumber.toString(),
+                                    mpesaReceiptNumber = message.substringAfter("Receipt number: ").takeIf { message.contains("Receipt number:") } ?: "",
+                                    paymentMethod = mpesaOption.toString(),
+                                    phoneNumber = phoneNumber
+                                )
 
-                            // Save payment to local SQLite database
-                            val paymentRepo = PaymentRepository(context)
-                            paymentRepo.insertPayment(payment)
-                            android.util.Log.d("Payment", "Payment saved to history (SQLite)")
-                            // Update dialog state instead of showing dialog directly
-                            successAmount = validFare.toString()
-                            successMessage = message
-                            showSuccessDialog = true
+                                // Save payment to local SQLite database
+                                val paymentRepo = PaymentRepository(context)
+                                paymentRepo.insertPayment(payment)
+                                android.util.Log.d("Payment", "Payment saved to history (SQLite)")
+                                // Update dialog state instead of showing dialog directly
+                                successAmount = validFare.toString()
+                                successMessage = message
+                                showSuccessDialog = true
+                            }
                         }
-                    }
+                    )
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B51F5)),
                 shape = RoundedCornerShape(8.dp),

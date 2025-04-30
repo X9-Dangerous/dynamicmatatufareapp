@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.dynamic_fare.auth.*
+import com.example.dynamic_fare.datastore.UserSessionDataStore
 import com.google.android.gms.auth.api.identity.Identity
 
 @Composable
@@ -39,6 +40,7 @@ fun LoginScreenContent(navController: NavController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var loginSuccessEmail by remember { mutableStateOf<String?>(null) }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -53,6 +55,12 @@ fun LoginScreenContent(navController: NavController) {
                     navigateByRole(navController, role, email)
                 }
             }
+        }
+    }
+
+    LaunchedEffect(loginSuccessEmail) {
+        loginSuccessEmail?.let {
+            UserSessionDataStore.saveUserEmail(context, it)
         }
     }
 
@@ -108,6 +116,7 @@ fun LoginScreenContent(navController: NavController) {
             onClick = {
                 authViewModel.loginUser(email, password) { result ->
                     if (result == "Matatu Operator" || result == "Matatu Client") {
+                        loginSuccessEmail = email
                         navigateByRole(navController, result, email)
                     } else {
                         errorMessage = result // Show error message
@@ -204,7 +213,7 @@ fun navigateByRole(navController: NavController, role: String?, email: String? =
         }
         "Matatu Client" -> {
             Log.d("LoginNavigation", "Navigating to clientHome for userId=$email")
-            navController.navigate("clientHome") {
+            navController.navigate("clientHome/$email") {
                 popUpTo(Routes.LoginScreenContent) { inclusive = true }
             }
         }

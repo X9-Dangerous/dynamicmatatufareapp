@@ -112,23 +112,18 @@ fun QRScannerScreen(
                             scannedValue = barcodeValue
                             // Instead of Firebase, use local Room DB to check for Matatu by registration number
                             val db = com.example.dynamic_fare.AppDatabase.getDatabase(context)
-                            
                             android.util.Log.d("QRScanner", "Scanning for registration number: $barcodeValue")
                             kotlinx.coroutines.MainScope().launch {
                                 try {
                                     val matatuDao = db.matatuDao()
-                                    // Print all matatus for debug
                                     val allMatatus = withContext(Dispatchers.IO) { matatuDao.getAllMatatus() }
                                     android.util.Log.d("QRScanner", "All registrations in DB: " + allMatatus.joinToString { it.registrationNumber })
-
-                                    // Normalize scanned value for comparison
                                     val normalizedBarcodeValue = barcodeValue.trim().lowercase()
                                     val matatu = allMatatus.find { it.registrationNumber.trim().lowercase() == normalizedBarcodeValue }
-                                    // If you want to keep using the DB query, you could also update your schema/query for case-insensitive matching
                                     if (matatu != null) {
                                         android.util.Log.d("QRScanner", "Found matatu: ${matatu.registrationNumber}, ID: ${matatu.matatuId}")
-                                        val userEmail = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: userId
-                                        navController.navigate(com.example.dynamic_fare.Routes.paymentPageWithQRCode(matatu.registrationNumber, userEmail)) {
+                                        // Pass userId directly from argument, not from Firebase
+                                        navController.navigate(com.example.dynamic_fare.Routes.paymentPageWithQRCode(matatu.registrationNumber, userId)) {
                                             popUpTo(com.example.dynamic_fare.Routes.QRScannerScreen) { inclusive = true }
                                         }
                                     } else {

@@ -2,9 +2,21 @@ package com.example.dynamic_fare
 
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -14,13 +26,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.dynamic_fare.data.SettingsDataStore
+import com.example.dynamic_fare.datastore.UserSessionDataStore
 import com.example.dynamic_fare.ui.screens.*
 import com.example.dynamic_fare.ui.theme.DynamicMatauFareAppTheme
 import com.example.dynamic_fare.ui.ChooseFleetDialog
 import com.example.dynamic_fare.ui.FleetRegistrationScreen
-import com.example.dynamic_fare.data.SettingsDataStore
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -54,6 +68,56 @@ class MainActivity : ComponentActivity() {
         setContent {
             DynamicMatauFareAppTheme {
                 val navController = rememberNavController()
+                var showExitDialog by remember { mutableStateOf(false) }
+                var backPressCount by remember { mutableStateOf(0) }
+                var lastBackPressTime by remember { mutableStateOf(0L) }
+
+                // On app launch, check if a user is already logged in
+                LaunchedEffect(Unit) {
+                    val email = UserSessionDataStore.getUserEmail(applicationContext).first()
+                    if (!email.isNullOrBlank()) {
+                        navController.navigate(Routes.matatuEstimateScreenRoute(email)) {
+                            popUpTo(0)
+                        }
+                    }
+                }
+
+                BackHandler {
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastBackPressTime > 2000) {
+                        // Reset if too much time has passed
+                        backPressCount = 1
+                        lastBackPressTime = currentTime
+                    } else {
+                        backPressCount += 1
+                        lastBackPressTime = currentTime
+                    }
+                    if (backPressCount == 2) {
+                        Toast.makeText(this@MainActivity, "Press back again to exit", Toast.LENGTH_SHORT).show()
+                    } else if (backPressCount == 3) {
+                        showExitDialog = true
+                        backPressCount = 0
+                    }
+                }
+
+                if (showExitDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showExitDialog = false },
+                        title = { Text("Exit App") },
+                        text = { Text("Are you sure you want to exit?") },
+                        confirmButton = {
+                            TextButton(onClick = { finishAffinity() }) {
+                                Text("Exit")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showExitDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
+
 
                 NavHost(navController = navController, startDestination = Routes.LoginScreenContent) {
                     composable(Routes.LoginScreenContent) { LoginScreenContent(navController) }
@@ -72,7 +136,7 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("userId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val userId = backStackEntry.arguments?.getString("userId") ?: ""
-                        MatatuEstimateScreen(navController)
+                        MatatuEstimateScreen(navController = navController, userId = userId)
                     }
 
                     composable(
@@ -83,7 +147,14 @@ class MainActivity : ComponentActivity() {
                         QRScannerScreen(navController = navController, userId = userId)
                     }
 
-                    composable(Routes.MatatuEstimateScreen) { MatatuEstimateScreen(navController = navController) }
+                    composable(
+                        route = Routes.MatatuEstimateScreen + "/{userId}",
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                        MatatuEstimateScreen(navController = navController, userId = userId)
+                    }
+
                     composable(Routes.PasswordRecoveryScreen) { PasswordRecoveryScreen(navController) }
 
                     composable(
@@ -225,6 +296,15 @@ class MainActivity : ComponentActivity() {
                     ) { backStackEntry ->
                         val userId = backStackEntry.arguments?.getString("userId") ?: ""
                         ClientProfileScreen(navController = navController, userId = userId)
+                    }
+
+                    // Support for clientHome/{userId} navigation
+                    composable(
+                        route = "clientHome/{userId}",
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                        MatatuEstimateScreen(navController = navController, userId = userId)
                     }
                 }
             }

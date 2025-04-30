@@ -63,11 +63,11 @@ import java.text.DecimalFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MatatuEstimateScreen(navController: NavController = rememberNavController()) {
+fun MatatuEstimateScreen(navController: NavController = rememberNavController(), userId: String) {
     val context = LocalContext.current
     val userRepository = remember { SqliteUserRepository(context) }
     val coroutineScope = rememberCoroutineScope()
-    var currentUserEmail by remember { mutableStateOf<String?>(null) }
+    var currentUserEmail by remember { mutableStateOf<String?>(userId) }
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var destinationLocation by remember { mutableStateOf<GeoPoint?>(null) }
@@ -94,16 +94,15 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
     var routeDirections by remember { mutableStateOf<List<String>>(emptyList()) }
 
     // Fetch current user email when screen loads
-    LaunchedEffect(Unit) {
+    LaunchedEffect(userId) {
         coroutineScope.launch {
             try {
-                // Get the current user from SQLite
-                val users = userRepository.getUserByEmail(currentUserEmail ?: "")
-                if (users != null) {
-                    currentUserEmail = users.email
+                val user = userRepository.getUserByEmail(userId)
+                if (user != null) {
+                    currentUserEmail = user.email
                     Log.d("MatatuEstimateScreen", "Found current user email: $currentUserEmail")
                 } else {
-                    Log.e("MatatuEstimateScreen", "No user found in SQLite database")
+                    Log.e("MatatuEstimateScreen", "No user found in SQLite database for email: $userId")
                 }
             } catch (e: Exception) {
                 Log.e("MatatuEstimateScreen", "Error fetching user: ${e.message}")
@@ -810,6 +809,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                             }
                         }
                     }
+
                     // Handle map zooming based on available points
                     mapView?.let { mapViewInstance ->
                         try {
@@ -909,8 +909,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
         // Pay Button
         Button(
             onClick = {
-                val userEmail = FirebaseAuth.getInstance().currentUser?.email ?: ""
-                navController.navigate(Routes.qrScannerRoute(userEmail))
+                navController.navigate(Routes.qrScannerRoute(userId))
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -932,7 +931,7 @@ fun MatatuEstimateScreen(navController: NavController = rememberNavController())
                 .padding(vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {
-            FooterWithIcons(navController, currentUserEmail ?: "")
+            FooterWithIcons(navController, userId)
         }
     }
 }
@@ -1269,5 +1268,5 @@ public fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Dou
 @Preview(showBackground = true)
 @Composable
 fun MatatuEstimateScreenPreview() {
-    MatatuEstimateScreen()
+    MatatuEstimateScreen(userId = "test@example.com")
 }

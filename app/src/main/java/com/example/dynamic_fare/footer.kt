@@ -50,15 +50,7 @@ fun FooterWithIcons(
                         Log.e("FooterWithIcons", "No user found in SQLite database for email: $userId")
                     }
                 } else {
-                    // If no userId provided, try to get the last logged in user
-                    val users = userRepository.getAllUsers()
-                    if (users.isNotEmpty()) {
-                        val lastUser = users.last()
-                        currentUserEmail = lastUser.email
-                        Log.d("FooterWithIcons", "Using last logged in user: $currentUserEmail")
-                    } else {
-                        Log.e("FooterWithIcons", "No users found in SQLite database")
-                    }
+                    Log.e("FooterWithIcons", "No userId provided to FooterWithIcons")
                 }
             } catch (e: Exception) {
                 Log.e("FooterWithIcons", "Error fetching user: ${e.message}")

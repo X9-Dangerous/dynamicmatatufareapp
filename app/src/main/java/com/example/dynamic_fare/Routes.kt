@@ -38,7 +38,7 @@ object Routes {
     const val ClientProfileScreen = "clientProfile/{userId}"
     const val SetNewPasswordScreen = "setNewPassword/{email}"
 
-    fun matatuEstimateRoute(userId: String): String = "clientHome/ $userId"
+    fun matatuEstimateRoute(userId: String): String = "clientHome/$userId"
     fun operatorHomeRoute(operatorId: String): String = "operatorHomeScreen/$operatorId"
     fun homeRoute(userId: String): String = "home/$userId"
     fun qrScannerRoute(userId: String): String = "qrScanner/$userId"
@@ -52,6 +52,7 @@ object Routes {
     fun clientProfileRoute(userId: String): String = "clientProfile/$userId"
     fun settingsRoute(userId: String): String = "settings/$userId"
     fun accessibilitySettingsRoute(userId: String): String = "accessibility/$userId"
+    fun matatuEstimateScreenRoute(userId: String): String = "clientHome/$userId"
 }
 
 @Composable
@@ -71,7 +72,7 @@ fun AppNavigation(
             arguments = listOf(navArgument("userId") { type = NavType.StringType })
         ) { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
-            MatatuEstimateScreen(navController)
+            MatatuEstimateScreen(navController, userId = userId)
         }
         composable(Routes.PasswordRecoveryScreen) { PasswordRecoveryScreen(navController) }
         composable(Routes.FareTabbedScreen) { backStackEntry ->
