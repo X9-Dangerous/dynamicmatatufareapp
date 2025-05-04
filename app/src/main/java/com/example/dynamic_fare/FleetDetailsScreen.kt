@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.dynamic_fare.data.FleetRepository
 import com.example.dynamic_fare.data.MatatuRepository
+import com.example.dynamic_fare.models.MatatuFares
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import com.google.firebase.database.FirebaseDatabase
@@ -27,15 +28,18 @@ fun FleetDetailsScreen(navController: NavController, fleetId: String) {
     var fleetName by remember { mutableStateOf("") }
     var matatuCount by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
+    var matatuFares by remember { mutableStateOf(listOf<MatatuFares>()) }
 
     LaunchedEffect(fleetId) {
         coroutineScope.launch {
             val fleetRepo = FleetRepository(context)
             val matatuRepo = MatatuRepository(context)
-            val fleet = fleetRepo.fetchFleetDetails(fleetId)
+            val fleet = fleetRepo.fetchFleetDetails(fleetId.toInt().toString())
             fleetName = fleet?.fleetName ?: ""
             val allMatatus = matatuRepo.getAllMatatus()
-            matatuCount = allMatatus.count { it.fleetname == fleetName }
+            matatuCount = allMatatus.count {
+                it.fleetId == fleetId
+            }
             isLoading = false
         }
     }
@@ -59,8 +63,26 @@ fun FleetDetailsScreen(navController: NavController, fleetId: String) {
                     Text("Fleet ID: $fleetId", style = MaterialTheme.typography.bodyLarge)
                     Text("Fleet Name: $fleetName", style = MaterialTheme.typography.bodyMedium)
                     Text("Number of Matatus: $matatuCount", style = MaterialTheme.typography.bodyMedium)
+                    matatuFares.forEach { fare ->
+                        if (fare.peakFare > 0.0) {
+                            Text("Matatu ID: ${fare.matatuId}, Peak Fare: ${fare.peakFare}", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        if (fare.nonPeakFare > 0.0) {
+                            Text("Matatu ID: ${fare.matatuId}, Non-Peak Fare: ${fare.nonPeakFare}", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        if (fare.rainyPeakFare > 0.0) {
+                            Text("Matatu ID: ${fare.matatuId}, Rainy Peak Fare: ${fare.rainyPeakFare}", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        if (fare.rainyNonPeakFare > 0.0) {
+                            Text("Matatu ID: ${fare.matatuId}, Rainy Non-Peak Fare: ${fare.rainyNonPeakFare}", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        if (fare.disabilityDiscount > 0.0) {
+                            Text("Matatu ID: ${fare.matatuId}, Disability Discount: ${fare.disabilityDiscount}", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
                 }
             }
         }
     }
 }
+

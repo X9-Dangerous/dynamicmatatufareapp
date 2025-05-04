@@ -30,7 +30,7 @@ fun PaymentPage(
     fareManager: FareManager,
     weatherManager: WeatherManager,
     timeManager: TimeManager,
-    getMatatuIdFromRegistration: (String, (String?) -> Unit) -> Unit,
+    getMatatuIdFromRegistration: (String, (Int?) -> Unit) -> Unit,
     onPaymentSuccess: () -> Unit = {},
     userId: String
 ) {
@@ -89,11 +89,12 @@ fun PaymentPage(
         val matatu = matatuRepository.getMatatuByRegistration(scannedQRCode)
         if (matatu != null) {
             registrationNumber = matatu.registrationNumber
-            // Use fleetname as the fallback for fleetId since Matatu does not have a fleetId field
-            val fleetId = matatu.fleetname
-            if (!fleetId.isNullOrEmpty()) {
-                val fleet = fleetRepository.fetchFleetDetails(fleetId)
-                fleetName = fleet?.fleetName
+            // Correct fleet name logic: prefer fleetId, fallback to fleetname
+            if (!matatu.fleetId.isNullOrEmpty()) {
+                val fleet = fleetRepository.fetchFleetDetails(matatu.fleetId)
+                fleetName = fleet?.fleetName ?: matatu.fleetname.takeIf { it.isNotEmpty() }
+            } else if (!matatu.fleetname.isNullOrEmpty()) {
+                fleetName = matatu.fleetname
             } else {
                 fleetName = null
             }
@@ -177,11 +178,11 @@ fun PaymentPage(
 
             // Start fare fetch immediately after getting matatu details
             val fareRepository = com.example.dynamic_fare.data.FareRepository(context)
-            val fares = matatu.matatuId.let { fareRepository.getFareDetails(it) }
-            if (fares != null) {
+            val faresList = fareRepository.getFaresForMatatu(matatu.matatuId.toIntOrNull() ?: -1)
+            if (faresList.isNotEmpty()) {
                 // Use fares
                 val isPeakHours = timeManager.isPeakHours()
-                val (baseFare, breakdown) = fareManager.getFare(fares, isPeakHours, isRaining, isDisabled, false)
+                val (baseFare, breakdown) = fareManager.getFare(faresList, isPeakHours, isRaining, isDisabled, false)
 
                 // Store original and final fares
                 originalFare = baseFare.toInt().toString()

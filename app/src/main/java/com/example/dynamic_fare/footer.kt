@@ -36,8 +36,9 @@ fun FooterWithIcons(
     val userRepository = remember { SqliteUserRepository(context) }
     val coroutineScope = rememberCoroutineScope()
     var currentUserEmail by remember { mutableStateOf<String?>(null) }
+    var currentUserRole by remember { mutableStateOf<String?>(null) }
 
-    // Fetch current user email when footer loads
+    // Fetch current user email and role when footer loads
     LaunchedEffect(userId) {
         coroutineScope.launch {
             try {
@@ -45,7 +46,8 @@ fun FooterWithIcons(
                     val user = userRepository.getUserByEmail(userId)
                     if (user != null) {
                         currentUserEmail = user.email
-                        Log.d("FooterWithIcons", "Found current user email: $currentUserEmail")
+                        currentUserRole = user.role
+                        Log.d("FooterWithIcons", "Found current user email: $currentUserEmail, role: $currentUserRole")
                     } else {
                         Log.e("FooterWithIcons", "No user found in SQLite database for email: $userId")
                     }
@@ -57,6 +59,9 @@ fun FooterWithIcons(
             }
         }
     }
+
+    // --- HARD BLOCK: Prevent operator from ever seeing clientHome/home screens ---
+    BlockOperatorOnClientScreens(navController, currentUserRole)
 
     Log.d("FooterWithIcons", "Footer loaded with userId: $userId")
     Column(modifier = Modifier.fillMaxSize()) {

@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
         val auth = FirebaseAuth.getInstance()
         val db = FirebaseDatabase.getInstance().reference
         val operatorId = auth.currentUser?.uid ?: ""
-        val fareManager = FareManager(FirebaseDatabase.getInstance())
+        val fareManager = FareManager(applicationContext)
         val timeManager = TimeManager()
         val weatherManager = WeatherManager()
 
@@ -75,9 +75,16 @@ class MainActivity : ComponentActivity() {
                 // On app launch, check if a user is already logged in
                 LaunchedEffect(Unit) {
                     val email = UserSessionDataStore.getUserEmail(applicationContext).first()
-                    if (!email.isNullOrBlank()) {
-                        navController.navigate(Routes.matatuEstimateScreenRoute(email)) {
-                            popUpTo(0)
+                    val role = UserSessionDataStore.getUserRole(applicationContext).first()
+                    if (!email.isNullOrBlank() && !role.isNullOrBlank()) {
+                        if (role == "Matatu Operator") {
+                            navController.navigate(Routes.operatorHomeRoute(email)) {
+                                popUpTo(0)
+                            }
+                        } else {
+                            navController.navigate(Routes.matatuEstimateScreenRoute(email)) {
+                                popUpTo(0)
+                            }
                         }
                     }
                 }
@@ -162,7 +169,7 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("matatuId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val matatuId = backStackEntry.arguments?.getString("matatuId") ?: ""
-                        MatatuDetailsScreen(navController = navController, matatuId = matatuId)
+                        MatatuDetailsScreen(navController = navController, matatuId = matatuId ?: "")
                     }
 
 
@@ -214,7 +221,9 @@ class MainActivity : ComponentActivity() {
                             timeManager = timeManager,
                             weatherManager = weatherManager,
                             getMatatuIdFromRegistration = { regNo, callback ->
-                                fareManager.getMatatuIdFromRegistration(regNo, callback)
+                                fareManager.getMatatuIdFromRegistration(regNo) { strId ->
+                                    callback(strId)
+                                }
                             },
                             userId = userId
                         )

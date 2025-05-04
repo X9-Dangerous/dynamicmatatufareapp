@@ -13,9 +13,11 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.dynamic_fare.data.FleetRepository
 import kotlinx.coroutines.launch
+import android.util.Log
 
 @Composable
 fun FleetRegistrationScreen(navController: NavController, operatorId: String) {
+    Log.d("FleetRegistrationScreen", "Received operatorId in FleetRegistrationScreen: $operatorId")
     var fleetName by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()

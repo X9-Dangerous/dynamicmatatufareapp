@@ -23,7 +23,7 @@ import com.example.dynamic_fare.auth.UserDao
 
 @Database(
     entities = [Stop::class, Route::class, Matatu::class, MatatuFares::class, Fleet::class, QrCode::class, User::class],
-    version = 8, 
+    version = 11, 
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -45,7 +45,8 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "gtfs_database"
-                ).addMigrations(MIGRATION_6_7, MIGRATION_7_8)
+                ).addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                 .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance
@@ -63,6 +64,13 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        // Dummy migration for version 8 to 9 (no schema change, just to bump version)
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // No changes, just bump version
             }
         }
     }

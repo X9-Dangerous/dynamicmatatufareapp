@@ -5,7 +5,7 @@ import java.io.File
 import java.util.zip.ZipFile
 import kotlin.math.pow
 
-class GTFSRepository(private val context: Context) {
+class GTFSRepository(val context: Context) {
 
     fun getDistanceAndTime(startStopId: String, endStopId: String, callback: (Double, Int) -> Unit) {
         val gtfsFile = File(context.filesDir, "gtfs_feed.zip")

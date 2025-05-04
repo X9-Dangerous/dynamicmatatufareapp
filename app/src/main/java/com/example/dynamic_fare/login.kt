@@ -61,6 +61,36 @@ fun LoginScreenContent(navController: NavController) {
     LaunchedEffect(loginSuccessEmail) {
         loginSuccessEmail?.let {
             UserSessionDataStore.saveUserEmail(context, it)
+            // Also save role if available
+            val user = sqliteUserRepository.getUserByEmail(it)
+            user?.role?.let { role ->
+                UserSessionDataStore.saveUserRole(context, role)
+            }
+        }
+    }
+
+    // --- AUTO-LOGIN LOGIC ---
+    LaunchedEffect(Unit) {
+        val emailFlow = UserSessionDataStore.getUserEmail(context)
+        val roleFlow = UserSessionDataStore.getUserRole(context)
+        emailFlow.collect { savedEmail ->
+            if (!savedEmail.isNullOrEmpty()) {
+                roleFlow.collect { savedRole ->
+                    if (!savedRole.isNullOrEmpty()) {
+                        // Double-check the user actually exists in the DB and is valid
+                        val user = sqliteUserRepository.getUserByEmail(savedEmail)
+                        if (user != null && user.role == savedRole) {
+                            navigateByRole(navController, savedRole, savedEmail)
+                        } else {
+                            // Session invalid, clear and go to login
+                            UserSessionDataStore.clearUserEmail(context)
+                            navController.navigate(Routes.LoginScreenContent) {
+                                popUpTo(Routes.LoginScreenContent) { inclusive = true }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -208,19 +238,37 @@ fun navigateByRole(navController: NavController, role: String?, email: String? =
         "Matatu Operator" -> {
             Log.d("LoginNavigation", "Navigating to operatorHomeScreen with operatorId=$email")
             navController.navigate(Routes.operatorHomeRoute(email)) {
-                popUpTo(Routes.LoginScreenContent) { inclusive = true }
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+                restoreState = true
             }
         }
         "Matatu Client" -> {
             Log.d("LoginNavigation", "Navigating to clientHome for userId=$email")
-            navController.navigate("clientHome/$email") {
-                popUpTo(Routes.LoginScreenContent) { inclusive = true }
+            navController.navigate(Routes.matatuEstimateRoute(email)) {
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+                restoreState = true
             }
         }
         else -> {
             Toast.makeText(navController.context, "Invalid role", Toast.LENGTH_SHORT).show()
             navController.navigate(Routes.LoginScreenContent) {
                 popUpTo(Routes.LoginScreenContent) { inclusive = true }
+            }
+        }
+    }
+}
+
+// --- HARD BLOCK: Prevent operator from ever seeing clientHome/home screens ---
+@Composable
+fun BlockOperatorOnClientScreens(navController: NavController, userRole: String?) {
+    LaunchedEffect(userRole) {
+        if (userRole == "Matatu Operator") {
+            navController.navigate(Routes.operatorHomeRoute("")) {
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+                restoreState = true
             }
         }
     }

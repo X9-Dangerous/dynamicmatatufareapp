@@ -45,6 +45,7 @@ import android.content.Context
 import android.provider.MediaStore
 import android.content.ContentValues
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
@@ -262,6 +263,7 @@ fun GtfsInputField(
 
 @Composable
 fun RegistrationScreen(navController: NavController, operatorId: String) {
+    Log.d("RegistrationScreen", "Received operatorId in RegistrationScreen: $operatorId")
     var regNumber by remember { mutableStateOf("") }
     var routeStart by remember { mutableStateOf("") }
     var routeEnd by remember { mutableStateOf("") }
@@ -559,17 +561,29 @@ fun RegistrationScreen(navController: NavController, operatorId: String) {
                         accountNumber = accountNumber,
                         tillNumber = tillNumber,
                         sendMoneyPhone = sendMoneyPhone,
-                        fleetname = selectedFleet?.fleetName ?: ""
+                        fleetname = selectedFleet?.fleetName ?: "",
+                        fleetId = selectedFleet?.fleetId // <-- Pass the selected fleetId
                     )
-                    
+
                     // Log after registration attempt
                     Log.d("MatatuRegistration", "Registration result: $success for ID: $registeredMatatuId, reg: $regNumber")
-                    
+
                     if (success) {
-                        // Verify matatu was saved by trying to read it back
+                        // Retrieve the integer matatuId from backend/DB using registration number
                         val savedMatatu = matatuRepository.getMatatuByRegistration(regNumber)
-                        Log.d("MatatuRegistration", "Verification - Found in database: ${savedMatatu != null}, ID: ${savedMatatu?.matatuId}")
-                        
+                        val intMatatuId = try { savedMatatu?.matatuId?.toInt() } catch (e: Exception) { null }
+                        Log.d("MatatuRegistration", "Verification - Found in database: ${savedMatatu != null}, intMatatuId: $intMatatuId, stringId: ${savedMatatu?.matatuId}")
+                        if (intMatatuId != null) {
+    Log.d("RegistrationNavigation", "Navigating to FareTabbedActivity with matatuId: $intMatatuId (integer DB ID)")
+                            // Navigate to FareTabbedActivity with integer matatuId
+                            val context = navController.context
+                            val intent = Intent(context, FareTabbedActivity::class.java)
+                            intent.putExtra("matatuId", intMatatuId.toString())
+                            context.startActivity(intent)
+                        } else {
+                            Toast.makeText(context, "Registration successful but unable to fetch valid matatu ID.", Toast.LENGTH_LONG).show()
+                        }
+
                         // Generate and save QR code
                         try {
                             val multiFormatWriter = MultiFormatWriter()

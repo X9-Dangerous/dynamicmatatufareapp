@@ -2,75 +2,87 @@ package com.example.dynamic_fare.data
 
 import android.content.Context
 import android.util.Log
-import com.example.dynamic_fare.AppDatabase
+import com.example.dynamic_fare.api.BackendApiService
 import com.example.dynamic_fare.models.MatatuFares
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class FareRepository(context: Context) {
-    private val fareDao = AppDatabase.getDatabase(context).fareDao()
+    private val backendApi = Retrofit.Builder()
+        .baseUrl("http://41.89.64.31:8000/")
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(BackendApiService::class.java)
 
-    suspend fun saveFares(
-        matatuId: String,
-        peak: String,
-        nonPeak: String,
-        rainyPeak: String,
-        rainyNonPeak: String,
-        discount: String
-    ): String = withContext(Dispatchers.IO) {
+
+    suspend fun saveFaresRaw(fareData: Map<String, Any?>): String = withContext(Dispatchers.IO) {
         try {
-            if (matatuId.isEmpty()) {
-                Log.e("FareRepository", "Invalid matatuId: empty string")
-                return@withContext "Error: Invalid Matatu ID"
+            val requiredKeys = listOf("matatuId", "peakFare", "nonPeakFare", "rainyPeakFare", "rainyNonPeakFare", "disabilityDiscount")
+            val nonNullFareData = fareData
+                .filterKeys { it in requiredKeys }
+                .mapValues { (k, v) ->
+                    when (k) {
+                        "matatuId" -> v?.toString() ?: ""
+                        else -> (v as? Number)?.toDouble() ?: 0.0
+                    }
+                } as Map<String, Any>
+            val response = backendApi.createFareRaw(nonNullFareData).execute()
+            if (response.isSuccessful) {
+                "✅ Fares saved successfully!"
+            } else {
+                "Error saving fares: ${response.message()}"
             }
-
-            // Validate fare values
-            val peakFare = peak.toDoubleOrNull()
-            val nonPeakFare = nonPeak.toDoubleOrNull()
-            val rainyPeakFare = rainyPeak.toDoubleOrNull()
-            val rainyNonPeakFare = rainyNonPeak.toDoubleOrNull()
-            val disabilityDiscount = discount.toDoubleOrNull()
-
-            if (peakFare == null || nonPeakFare == null || rainyPeakFare == null || rainyNonPeakFare == null) {
-                Log.e("FareRepository", "Invalid fare values")
-                return@withContext "Error: Please enter valid fare amounts"
-            }
-
-            // Create a MatatuFares object
-            val fareData = MatatuFares(
-                matatuId = matatuId,
-                peakFare = peakFare,
-                nonPeakFare = nonPeakFare,
-                rainyPeakFare = rainyPeakFare,
-                rainyNonPeakFare = rainyNonPeakFare,
-                disabilityDiscount = disabilityDiscount ?: 0.0
-            )
-
-            Log.d("FareRepository", "Saving fares for matatu: $matatuId with data: $fareData")
-            fareDao.insertFare(fareData)
-            Log.d("FareRepository", "Fares saved successfully for matatu: $matatuId")
-            "✅ Fares saved successfully!"
         } catch (e: Exception) {
-            Log.e("FareRepository", "Error saving fares for matatu: $matatuId", e)
             "Error saving fares: ${e.message}"
         }
     }
 
-    suspend fun getFareDetails(matatuId: String): MatatuFares? = withContext(Dispatchers.IO) {
+    suspend fun getFareDetails(matatuId: Int): MatatuFares? = withContext(Dispatchers.IO) {
         try {
-            fareDao.getFareByMatatuId(matatuId)
+            val response = backendApi.getFareByMatatuId(matatuId).execute()
+            if (response.isSuccessful) {
+                response.body()
+            } else {
+                null
+            }
         } catch (e: Exception) {
-            Log.e("FareRepository", "Error fetching fare details for matatu: $matatuId", e)
             null
         }
     }
 
-    suspend fun deleteFare(matatuId: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun getFaresForMatatu(matatuId: Int): List<MatatuFares> = withContext(Dispatchers.IO) {
         try {
-            fareDao.deleteFareByMatatuId(matatuId)
-            true
+            val response = backendApi.getFaresForMatatu(matatuId).execute()
+            Log.d("FareRepository", "Raw response body: ${response.body()}")
+            if (response.isSuccessful) {
+                response.body() ?: emptyList()
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e("FareRepository", "Error fetching fares for matatu: $matatuId", e)
+            emptyList()
+        }
+    }
+
+    suspend fun deleteFare(matatuId: Int): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val response = backendApi.deleteFare(matatuId).execute()
+            response.isSuccessful
         } catch (e: Exception) {
             Log.e("FareRepository", "Error deleting fare for matatu: $matatuId", e)
+            false
+        }
+    }
+
+    suspend fun updateFare(fareId: Int, updatedFare: MatatuFares): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val response = backendApi.updateFare(fareId, updatedFare).execute()
+            response.isSuccessful
+        } catch (e: Exception) {
+            Log.e("FareRepository", "Error updating fare", e)
             false
         }
     }

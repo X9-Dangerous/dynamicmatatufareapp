@@ -33,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OperatorHomeScreen(navController: NavController, operatorId: String) {
+    Log.d("OperatorHomeScreen", "Passing operatorId from OperatorHomeScreen: $operatorId")
     var selectedTab by remember { mutableStateOf(0) }
     val matatuList = remember { mutableStateListOf<Matatu>() }
     val fleetList = remember { mutableStateListOf<Fleet>() }
@@ -58,7 +59,7 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
             matatuList.addAll(matatus)
             // Log all matatu IDs and registration numbers for debugging
             matatuList.forEach {
-                Log.d("OperatorHomeScreen", "Matatu loaded: id=${it.matatuId}, reg=${it.registrationNumber}")
+                Log.d("OperatorHomeScreen", "Matatu loaded: id=${it.matatuId}, reg=${it.registrationNumber}, routeStart=${it.routeStart}, routeEnd=${it.routeEnd}, mpesaOption=${it.mpesaOption}, sendMoneyPhone=${it.sendMoneyPhone}")
             }
             isLoadingMatatus = false
         }
@@ -69,6 +70,10 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
             Log.d("OperatorHomeScreen", "Received ${fleets.size} fleets for operatorId: $operatorId")
             fleetList.clear()
             fleetList.addAll(fleets)
+            // Log all fleet IDs and names for debugging
+            fleetList.forEach {
+                Log.d("OperatorHomeScreen", "Fleet loaded: id=${it.fleetId}, name=${it.fleetName}, operatorId=${it.operatorId}")
+            }
             isLoadingFleets = false
         }
     }
@@ -129,7 +134,7 @@ fun OperatorHomeScreen(navController: NavController, operatorId: String) {
             } else {
                 when (selectedTab) {
                     0 -> MatatuList(navController, matatuList, operatorId, coroutineScope, matatuRepository)
-                    1 -> FleetList(navController, fleetList, operatorId)
+                    1 -> FleetList(navController, fleetList, operatorId, matatuList, coroutineScope, fleetRepository)
                 }
             }
         }
@@ -150,13 +155,19 @@ fun MatatuList(navController: NavController, matatuList: List<Matatu>, operatorI
 }
 
 @Composable
-fun FleetList(navController: NavController, fleetList: List<Fleet>, operatorId: String) {
+fun FleetList(navController: NavController, fleetList: List<Fleet>, operatorId: String, matatuList: List<Matatu>, coroutineScope: CoroutineScope, fleetRepository: FleetRepository) {
     if (fleetList.isEmpty()) {
         EmptyStateMessage("No Fleets Available")
     } else {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn {
             items(fleetList) { fleet ->
-                FleetDetailItem(fleet, navController, operatorId)
+                val matatuCount = matatuList.count { it.fleetname == fleet.fleetName }
+                FleetDetailItem(fleet, navController, operatorId, matatuCount) { fleetToDelete ->
+                    coroutineScope.launch {
+                        val deleted = fleetRepository.deleteFleet(fleetToDelete.fleetId)
+                        if (deleted) { /* update UI, show toast, etc. */ }
+                    }
+                }
             }
         }
     }
@@ -251,7 +262,7 @@ fun MatatuDetailItem(matatu: Matatu, navController: NavController, operatorId: S
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FleetDetailItem(fleet: Fleet, navController: NavController, operatorId: String) {
+fun FleetDetailItem(fleet: Fleet, navController: NavController, operatorId: String, matatuCount: Int, onDeleteFleet: (Fleet) -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -261,12 +272,49 @@ fun FleetDetailItem(fleet: Fleet, navController: NavController, operatorId: Stri
             },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Text(
-            text = "Fleet: ${fleet.fleetName}",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(16.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Fleet: ${fleet.fleetName}",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium
+            )
+            if (matatuCount == 0) {
+                var showDeleteDialog by remember { mutableStateOf(false) }
+                IconButton(onClick = { showDeleteDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete Fleet",
+                        tint = Color.Red
+                    )
+                }
+                if (showDeleteDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteDialog = false },
+                        title = { Text("Delete Fleet") },
+                        text = { Text("Are you sure you want to delete this fleet? This action cannot be undone.") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showDeleteDialog = false
+                                onDeleteFleet(fleet)
+                            }) {
+                                Text("Delete", color = Color.Red)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 

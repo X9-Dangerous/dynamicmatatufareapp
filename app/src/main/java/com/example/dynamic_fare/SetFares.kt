@@ -1,6 +1,5 @@
 package com.example.dynamic_fare
 
-
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -24,7 +23,6 @@ import com.example.dynamic_fare.ui.screens.FareTabbedActivity
 import androidx.compose.material3.ButtonDefaults
 import kotlinx.coroutines.launch
 
-
 class SetFaresActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,7 +41,6 @@ fun SetFaresScreen(matatuId: String) {
     val coroutineScope = rememberCoroutineScope()
     val fareRepository = remember(context) { FareRepository(context) }
 
-    // State variables to store fare values
     var peakHours by remember { mutableStateOf("") }
     var nonPeakHours by remember { mutableStateOf("") }
     var rainingPeakFare by remember { mutableStateOf("") }
@@ -54,7 +51,7 @@ fun SetFaresScreen(matatuId: String) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(WindowInsets.statusBars.asPaddingValues()) // Ensures it doesn't overlap the status bar
+            .padding(WindowInsets.statusBars.asPaddingValues())
             .background(Color.White)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -67,7 +64,6 @@ fun SetFaresScreen(matatuId: String) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Input Fields for fare settings
         OutlinedTextField(
             value = peakHours,
             onValueChange = { peakHours = it },
@@ -118,21 +114,16 @@ fun SetFaresScreen(matatuId: String) {
 
         Spacer(modifier = Modifier.height(70.dp))
 
-        // Save Button
-
         Button(
             onClick = {
-                // Validation block
                 if (matatuId.isEmpty()) {
                     message = "Error: Invalid Matatu ID"
                     return@Button
                 }
-
-                // Validate that all fare inputs are numbers and greater than zero
                 val peakFare = peakHours.toDoubleOrNull()
                 val nonPeakFare = nonPeakHours.toDoubleOrNull()
-                val rainyPeakFare = rainingPeakFare.toDoubleOrNull()
-                val rainyNonPeakFare = rainingNonPeakFare.toDoubleOrNull()
+                val rainyPeakFareVal = rainingPeakFare.toDoubleOrNull()
+                val rainyNonPeakFareVal = rainingNonPeakFare.toDoubleOrNull()
                 val discount = disabilityDiscount.toDoubleOrNull()
 
                 if (peakFare == null || peakFare <= 0) {
@@ -143,11 +134,11 @@ fun SetFaresScreen(matatuId: String) {
                     message = "Error: Non-Peak Hours Fare must be a number greater than zero"
                     return@Button
                 }
-                if (rainyPeakFare == null || rainyPeakFare <= 0) {
+                if (rainyPeakFareVal == null || rainyPeakFareVal <= 0) {
                     message = "Error: Rainy Peak Hours Fare must be a number greater than zero"
                     return@Button
                 }
-                if (rainyNonPeakFare == null || rainyNonPeakFare <= 0) {
+                if (rainyNonPeakFareVal == null || rainyNonPeakFareVal <= 0) {
                     message = "Error: Rainy Non-Peak Hours Fare must be a number greater than zero"
                     return@Button
                 }
@@ -156,32 +147,58 @@ fun SetFaresScreen(matatuId: String) {
                     return@Button
                 }
 
-                Log.d("SetFaresScreen", "Saving fares for matatuId: $matatuId")
                 Log.d("SetFaresScreen", "Fare values: peak=$peakHours, nonPeak=$nonPeakHours, rainyPeak=$rainingPeakFare, rainyNonPeak=$rainingNonPeakFare, discount=$disabilityDiscount")
 
                 coroutineScope.launch {
-                    val resultMessage = fareRepository.saveFares(
-                        matatuId = matatuId,
-                        peak = peakHours,
-                        nonPeak = nonPeakHours,
-                        rainyPeak = rainingPeakFare,
-                        rainyNonPeak = rainingNonPeakFare,
-                        discount = disabilityDiscount
-                    )
-                    
-                    message = resultMessage
-
-                    if (resultMessage == "✅ Fares saved successfully!") {
-                        // Navigate back to MatatuDetailsScreen
-                        val intent = Intent(context, FareTabbedActivity::class.java).apply {
-                            putExtra("matatuId", matatuId)
-                            // Clear the back stack
-                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        context.startActivity(intent)
-                        (context as? ComponentActivity)?.finish() // Close the current activity
-                    }
-                }
+    val matatuIdInt = matatuId.toIntOrNull()
+    if (matatuIdInt == null) {
+        message = "Error: Invalid Matatu ID (must be a number)"
+        return@launch
+    }
+    // Check if fare already exists for this matatu
+    val fares = fareRepository.getFaresForMatatu(matatuIdInt)
+    val existingFare = fares.firstOrNull()
+    val fareData = mapOf(
+        "matatuId" to matatuIdInt,
+        "peakFare" to peakFare,
+        "nonPeakFare" to nonPeakFare,
+        "rainyPeakFare" to rainyPeakFareVal,
+        "rainyNonPeakFare" to rainyNonPeakFareVal,
+        "disabilityDiscount" to discount
+    )
+    if (existingFare != null) {
+        // Update existing fare
+        val updatedFare = existingFare.copy(
+            peakFare = peakFare ?: existingFare.peakFare,
+            nonPeakFare = nonPeakFare ?: existingFare.nonPeakFare,
+            rainyPeakFare = rainyPeakFareVal ?: existingFare.rainyPeakFare,
+            rainyNonPeakFare = rainyNonPeakFareVal ?: existingFare.rainyNonPeakFare,
+            disabilityDiscount = discount ?: existingFare.disabilityDiscount
+        )
+        val success = fareRepository.updateFare(existingFare.fareId, updatedFare)
+        message = if (success) "✅ Fares updated successfully!" else "Error updating fares."
+        if (success) {
+            val intent = Intent(context, FareTabbedActivity::class.java).apply {
+                putExtra("matatuId", matatuId)
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+            (context as? ComponentActivity)?.finish()
+        }
+    } else {
+        // No fare exists, create new
+        val resultMessage = fareRepository.saveFaresRaw(fareData)
+        message = resultMessage
+        if (resultMessage == "✅ Fares saved successfully!") {
+            val intent = Intent(context, FareTabbedActivity::class.java).apply {
+                putExtra("matatuId", matatuId)
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+            (context as? ComponentActivity)?.finish()
+        }
+    }
+}
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
@@ -193,14 +210,11 @@ fun SetFaresScreen(matatuId: String) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Display message after saving fares
         if (message.isNotEmpty()) {
             Text(text = message, color = Color.Green, fontSize = 16.sp)
         }
     }
 }
-
-
 
 @Preview(showBackground = true)
 @Composable

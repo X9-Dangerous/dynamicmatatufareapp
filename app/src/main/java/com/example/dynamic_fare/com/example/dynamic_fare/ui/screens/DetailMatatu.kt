@@ -53,6 +53,7 @@ class FareTabbedActivity : ComponentActivity() {
 
 @Composable
 fun FareTabbedScreen(navController: NavController, matatuId: String) {
+    Log.d("FareTabbedScreen", "Received matatuId: $matatuId (should be integer DB ID as string)")
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("Matatu Details", "Fare Details")
 
@@ -78,18 +79,21 @@ fun FareTabbedScreen(navController: NavController, matatuId: String) {
 
 @Composable
 fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
+    Log.d("MatatuDetailsScreen", "Displaying details for matatuId: $matatuId")
     var matatuDetails by remember { mutableStateOf<MatatuDetails?>(null) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val matatuRepository = remember(context) { MatatuRepository(context) }
 
     LaunchedEffect(matatuId) {
-        // This is already a coroutine context, so we don't need another launch
         try {
-            // Use Room repository instead of Firebase
-            val matatu = matatuRepository.fetchMatatuDetails(matatuId)
+            val matatuIdInt = matatuId.toIntOrNull()
+            if (matatuIdInt == null) {
+                Toast.makeText(context, "Invalid Matatu ID", Toast.LENGTH_SHORT).show()
+                return@LaunchedEffect
+            }
+            val matatu = matatuRepository.fetchMatatuDetails(matatuIdInt)
             if (matatu != null) {
-                // Convert Matatu to MatatuDetails
                 matatuDetails = MatatuDetails(
                     matatuId = matatu.matatuId,
                     registrationNumber = matatu.registrationNumber,
@@ -104,13 +108,10 @@ fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
                     accountNumber = matatu.accountNumber,
                     operatorId = matatu.operatorId
                 )
-                Log.d("MatatuDetailsScreen", "Loaded matatu details from Room: ${matatu.matatuId}, reg: ${matatu.registrationNumber}")
             } else {
-                Log.e("MatatuDetailsScreen", "Matatu details not found in Room for ID: $matatuId")
                 Toast.makeText(context, "Matatu details not found", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Log.e("MatatuDetailsScreen", "Error loading matatu details: ${e.message}")
             Toast.makeText(context, "Error loading matatu details: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
@@ -416,7 +417,7 @@ fun MatatuDetailsScreen(navController: NavController, matatuId: String) {
 }
 
 @Composable
-private fun DetailRow(
+fun DetailRow(
     label: String,
     value: String,
     isHighlighted: Boolean = false
@@ -447,26 +448,62 @@ private fun DetailRow(
 
 @Composable
 fun FareDetailsScreen(matatuId: String) {
-    var fareData by remember { mutableStateOf<MatatuFares?>(null) }
+    val matatuIdInt = matatuId.toIntOrNull()
     val context = LocalContext.current
+    if (matatuIdInt == null) {
+        Toast.makeText(context, "Invalid Matatu ID", Toast.LENGTH_SHORT).show()
+        return
+    }
+    Log.d("FareDetailsScreen", "Fetching fares for matatuId: $matatuId (should be integer DB ID)")
+    // Declare all state and variables at the top
+    var fareData by remember { mutableStateOf<List<MatatuFares>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
     val fareRepository = remember(context) { FareRepository(context) }
-    var isLoading by remember { mutableStateOf(true) }
+    val activity = context as? ComponentActivity
 
-    LaunchedEffect(matatuId) {
-        coroutineScope.launch {
-            try {
-                // Use Room instead of Firebase
-                val loadedFares = fareRepository.getFareDetails(matatuId)
-                fareData = loadedFares
-                Log.d("FareDetailsScreen", "Loaded fares: $loadedFares for matatu: $matatuId")
-            } catch (e: Exception) {
-                Log.e("FareDetailsScreen", "Error loading fares: ${e.message}")
-            } finally {
-                isLoading = false
+    // Lifecycle observer for refreshing fares when returning
+    DisposableEffect(activity) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                coroutineScope.launch {
+                    try {
+                        val loadedFares = fareRepository.getFaresForMatatu(matatuIdInt!!)
+                        fareData = loadedFares
+                        Log.d("FareDetailsScreen", "Reloaded fares after SetFaresActivity: $loadedFares for matatu: $matatuIdInt")
+                    } catch (e: Exception) {
+                        Log.e("FareDetailsScreen", "Error reloading fares: ${e.message}")
+                    }
+                }
             }
         }
+        activity?.lifecycle?.addObserver(observer)
+        onDispose {
+            activity?.lifecycle?.removeObserver(observer)
+        }
     }
+
+
+    LaunchedEffect(matatuId) {
+    coroutineScope.launch {
+        val matatuIdInt = matatuId.toIntOrNull()
+        if (matatuIdInt == null) {
+            Log.e("FareDetailsScreen", "Invalid Matatu ID for fetching fares: $matatuId")
+            isLoading = false
+            return@launch
+        }
+        try {
+            // Use Room instead of Firebase
+            val loadedFares = fareRepository.getFaresForMatatu(matatuIdInt!!)
+            fareData = loadedFares
+            Log.d("FareDetailsScreen", "Loaded fares: $loadedFares for matatu: $matatuIdInt")
+        } catch (e: Exception) {
+            Log.e("FareDetailsScreen", "Error loading fares: ${e.message}")
+        } finally {
+            isLoading = false
+        }
+    }
+}
 
     LazyColumn(
         modifier = Modifier
@@ -502,7 +539,7 @@ fun FareDetailsScreen(matatuId: String) {
                     }
                 }
             }
-        } else if (fareData == null) {
+        } else if (fareData.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -538,101 +575,103 @@ fun FareDetailsScreen(matatuId: String) {
                 }
             }
         } else {
-            // Standard Fares Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            "Standard Fares",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.Black,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-                        
-                        FareRow("Peak Hours", "Ksh ${fareData?.peakFare ?: ""}")
-                        Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
-                        FareRow("Off-Peak Hours", "Ksh ${fareData?.nonPeakFare ?: ""}")
+            // Only render fare cards for fares with meaningful data (not just default/empty)
+            val realFares = fareData.filter { fare ->
+                fare.peakFare > 0.0 || fare.nonPeakFare > 0.0 || fare.rainyPeakFare > 0.0 || fare.rainyNonPeakFare > 0.0 || fare.disabilityDiscount > 0.0
+            }
+            if (realFares.isEmpty()) {
+                // No real fares, show prompt to add fares
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFAFAFA))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "No fare data found for this matatu.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.Black,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            Button(
+                                onClick = {
+                                    val intent = Intent(context, SetFaresActivity::class.java).apply {
+                                        putExtra("matatuId", matatuId)
+                                    }
+                                    context.startActivity(intent)
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Black,
+                                    contentColor = Color.White
+                                ),
+                                modifier = Modifier.padding(top = 8.dp)
+                            ) {
+                                Text("Set Fares", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                            }
+                        }
                     }
                 }
-            }
-            
-            // Rainy Weather Fares Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            "Rainy Weather Fares",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.Black,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-                        
-                        FareRow("Peak Hours", "Ksh ${fareData?.rainyPeakFare ?: ""}")
-                        Divider(color = Color(0xFFBBDEFB), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
-                        FareRow("Off-Peak Hours", "Ksh ${fareData?.rainyNonPeakFare ?: ""}")
+            } else {
+                realFares.forEach { fare ->
+                    // Standard Fares Card
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                if (fare.peakFare > 0.0) {
+                                    FareRow("Peak Fare", "Ksh ${fare.peakFare}")
+                                }
+                                if (fare.nonPeakFare > 0.0) {
+                                    FareRow("Non-Peak Fare", "Ksh ${fare.nonPeakFare}")
+                                }
+                                if (fare.rainyPeakFare > 0.0) {
+                                    FareRow("Rainy Peak Fare", "Ksh ${fare.rainyPeakFare}")
+                                }
+                                if (fare.rainyNonPeakFare > 0.0) {
+                                    FareRow("Rainy Non-Peak Fare", "Ksh ${fare.rainyNonPeakFare}")
+                                }
+                                if (fare.disabilityDiscount > 0.0) {
+                                    FareRow("Disability Discount", "${fare.disabilityDiscount}%")
+                                }
+                            }
+                        }
                     }
                 }
-            }
-            
-            // Disability Discount Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FBE7))
-                ) {
-                    Row(
+                // Update Button
+                item {
+                    Button(
+                        onClick = {
+                            val intent = Intent(context, SetFaresActivity::class.java).apply {
+                                putExtra("matatuId", matatuId)
+                            }
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Black,
+                            contentColor = Color.White
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(vertical = 8.dp)
                     ) {
-                        Text(
-                            "♿ Disability Discount", 
-                            style = MaterialTheme.typography.titleMedium, 
-                            color = Color.Black
-                        )
-                        Text(
-                            "${fareData?.disabilityDiscount ?: ""}%", 
-                            style = MaterialTheme.typography.titleLarge, 
-                            color = Color(0xFF558B2F)
-                        )
+                        Text("✏️ Update Fares", modifier = Modifier.padding(vertical = 8.dp))
                     }
-                }
-            }
-            
-            // Update Button
-            item {
-                Button(
-                    onClick = {
-                        val intent = Intent(context, SetFaresActivity::class.java).apply {
-                            putExtra("matatuId", matatuId)
-                        }
-                        context.startActivity(intent)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Black,
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Text("✏️ Update Fares", modifier = Modifier.padding(vertical = 8.dp))
                 }
             }
         }
+
+        // Listen for result from SetFaresActivity and refresh fares when returning
+
     }
 }
 
 @Composable
-private fun FareRow(label: String, value: String) {
+fun FareRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

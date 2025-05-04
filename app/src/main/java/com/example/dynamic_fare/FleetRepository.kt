@@ -2,16 +2,22 @@ package com.example.dynamic_fare.data
 
 import android.content.Context
 import android.util.Log
-import com.example.dynamic_fare.AppDatabase
+import com.example.dynamic_fare.api.BackendApiService
 import com.example.dynamic_fare.models.Fleet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class FleetRepository(context: Context) {
-    private val fleetDao = AppDatabase.getDatabase(context).fleetDao()
+    private val backendApi = Retrofit.Builder()
+        .baseUrl("http://41.89.64.31:8000/")
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(BackendApiService::class.java)
 
     // Register a new fleet with fleetName and operatorId
     suspend fun registerFleet(
@@ -19,17 +25,16 @@ class FleetRepository(context: Context) {
         operatorId: String
     ): String? = withContext(Dispatchers.IO) {
         return@withContext try {
-            // Generate a unique ID for the fleet
             val fleetId = System.currentTimeMillis().toString()
             val fleet = Fleet(
                 fleetId = fleetId,
                 fleetName = fleetName,
                 operatorId = operatorId
             )
-            fleetDao.insertFleet(fleet)
-            fleetId
+            Log.d("FleetRepository", "Sending fleet to backend: $fleet")
+            val response = backendApi.createFleet(fleet).execute()
+            if (response.isSuccessful) fleetId else null
         } catch (e: Exception) {
-            Log.e("FleetRepository", "Error registering fleet", e)
             null
         }
     }
@@ -37,7 +42,12 @@ class FleetRepository(context: Context) {
     // Fetch fleets for a given operator
     suspend fun fetchFleetsForOperator(operatorId: String): List<Fleet> = withContext(Dispatchers.IO) {
         try {
-            fleetDao.getFleetsByOperatorId(operatorId)
+            val response = backendApi.getFleetsForOperator(operatorId).execute()
+            if (response.isSuccessful) {
+                response.body() ?: emptyList()
+            } else {
+                emptyList()
+            }
         } catch (e: Exception) {
             Log.e("FleetRepository", "Error fetching fleets", e)
             emptyList()
@@ -47,8 +57,12 @@ class FleetRepository(context: Context) {
     // Get fleets for an operator as a Flow for reactivity
     fun getFleetsForOperatorAsFlow(operatorId: String): Flow<List<Fleet>> = flow {
         try {
-            val fleets = fleetDao.getFleetsByOperatorId(operatorId)
-            emit(fleets)
+            val response = backendApi.getFleetsForOperator(operatorId).execute()
+            if (response.isSuccessful) {
+                emit(response.body() ?: emptyList())
+            } else {
+                emit(emptyList())
+            }
         } catch (e: Exception) {
             Log.e("FleetRepository", "Error fetching fleets as flow", e)
             emit(emptyList())
@@ -58,24 +72,16 @@ class FleetRepository(context: Context) {
     // Fetch details of a specific fleet
     suspend fun fetchFleetDetails(fleetId: String): Fleet? = withContext(Dispatchers.IO) {
         try {
-            fleetDao.getFleetById(fleetId)
-        } catch (e: Exception) {
-            Log.e("FleetRepository", "Error fetching fleet details", e)
-            null
-        }
+            val response = backendApi.getFleetById(fleetId).execute()
+            if (response.isSuccessful) response.body() else null
+        } catch (e: Exception) { null }
     }
 
     // Delete a fleet
     suspend fun deleteFleet(fleetId: String): Boolean = withContext(Dispatchers.IO) {
         return@withContext try {
-            val fleet = fleetDao.getFleetById(fleetId)
-            if (fleet != null) {
-                fleetDao.deleteFleetById(fleetId)
-                true
-            } else {
-                Log.e("FleetRepository", "Fleet not found")
-                false
-            }
+            val response = backendApi.deleteFleet(fleetId).execute()
+            response.isSuccessful
         } catch (e: Exception) {
             Log.e("FleetRepository", "Error deleting fleet", e)
             false
@@ -87,12 +93,12 @@ class FleetRepository(context: Context) {
     fun fetchFleetDetails(fleetId: String, onResult: (Fleet?) -> Unit) {
         Thread {
             try {
-                // Use runBlocking to call the suspend function from a non-coroutine context
-                // This is safe because we're already in a background thread
-                val fleet = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) { 
-                    fleetDao.getFleetById(fleetId) 
+                val response = backendApi.getFleetById(fleetId).execute()
+                if (response.isSuccessful) {
+                    onResult(response.body())
+                } else {
+                    onResult(null)
                 }
-                onResult(fleet)
             } catch (e: Exception) {
                 Log.e("FleetRepository", "Error in callback fetchFleetDetails", e)
                 onResult(null)

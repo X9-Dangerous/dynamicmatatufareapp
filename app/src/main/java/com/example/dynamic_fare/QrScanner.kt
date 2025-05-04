@@ -1,5 +1,6 @@
 package com.example.dynamic_fare.ui.screens
 
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Size as AndroidSize
@@ -32,6 +33,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import com.example.dynamic_fare.Routes
+import com.example.dynamic_fare.data.MatatuRepository
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -52,6 +54,8 @@ fun QRScannerScreen(
     userId: String
 ) {
     val context = LocalContext.current
+    val matatuRepository = MatatuRepository(context)
+
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -110,39 +114,33 @@ fun QRScannerScreen(
                     onBarcodeScanned = { barcodeValue ->
                         if (scannedValue == null) {
                             scannedValue = barcodeValue
-                            // Instead of Firebase, use local Room DB to check for Matatu by registration number
-                            val db = com.example.dynamic_fare.AppDatabase.getDatabase(context)
+                            // Lookup matatu by registration number from the server
                             android.util.Log.d("QRScanner", "Scanning for registration number: $barcodeValue")
-                            kotlinx.coroutines.MainScope().launch {
-                                try {
-                                    val matatuDao = db.matatuDao()
-                                    val allMatatus = withContext(Dispatchers.IO) { matatuDao.getAllMatatus() }
-                                    android.util.Log.d("QRScanner", "All registrations in DB: " + allMatatus.joinToString { it.registrationNumber })
-                                    val normalizedBarcodeValue = barcodeValue.trim().lowercase()
-                                    val matatu = allMatatus.find { it.registrationNumber.trim().lowercase() == normalizedBarcodeValue }
-                                    if (matatu != null) {
-                                        android.util.Log.d("QRScanner", "Found matatu: ${matatu.registrationNumber}, ID: ${matatu.matatuId}")
-                                        // Pass userId directly from argument, not from Firebase
-                                        navController.navigate(com.example.dynamic_fare.Routes.paymentPageWithQRCode(matatu.registrationNumber, userId)) {
-                                            popUpTo(com.example.dynamic_fare.Routes.QRScannerScreen) { inclusive = true }
-                                        }
-                                    } else {
-                                        android.util.Log.d("QRScanner", "No matatu found with registration number: $barcodeValue (normalized: $normalizedBarcodeValue)")
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            "No matatu found with this registration number: $barcodeValue",
-                                            android.widget.Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                } catch (e: Exception) {
-                                    android.util.Log.e("QRScanner", "Error looking up matatu: ${e.message}", e)
-                                    android.widget.Toast.makeText(
-                                        context,
-                                        "Error looking up matatu: ${e.message}",
-                                        android.widget.Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            }
+                            MainScope().launch {
+    try {
+        val matatu = withContext(Dispatchers.IO) {
+            matatuRepository.getMatatuByRegistration(barcodeValue.trim())
+        }
+        if (matatu != null) {
+            navController.navigate(Routes.paymentPageWithQRCode(matatu.registrationNumber, userId)) {
+                popUpTo(Routes.QRScannerScreen) { inclusive = true }
+            }
+        } else {
+            android.widget.Toast.makeText(
+                context,
+                "No matatu found with this registration number: $barcodeValue",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("QRScanner", "Error looking up matatu: ${e.message}", e)
+        android.widget.Toast.makeText(
+            context,
+            "Network error: ${e.message}",
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
+    }
+}
                         }
                     }
                 )

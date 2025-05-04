@@ -1,10 +1,10 @@
 package com.example.dynamic_fare
 
-import com.google.firebase.database.FirebaseDatabase
+import com.example.dynamic_fare.api.RetrofitInstance
 import okhttp3.*
 
 class FareProcessor(
-    private val database: FirebaseDatabase,
+
     private val weatherManager: WeatherManager,
     private val fareManager: FareManager,
     private val timeManager: TimeManager
@@ -23,7 +23,7 @@ class FareProcessor(
         weatherManager.fetchWeather { isRaining ->
 
             // Fetch fare details based on matatuId
-            fareManager.fetchFares(matatuId) { fares ->
+            fareManager.fetchFares(matatuId.toIntOrNull() ?: -1) { fares ->
 
                 if (fares != null) {
                     // Determine if it's peak hours

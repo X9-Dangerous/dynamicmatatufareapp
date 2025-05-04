@@ -9,7 +9,7 @@ interface FareDao {
     suspend fun insertFare(fare: MatatuFares)
 
     @Query("SELECT * FROM matatu_fares WHERE matatuId = :matatuId LIMIT 1")
-    suspend fun getFareByMatatuId(matatuId: String): MatatuFares?
+    suspend fun getFareByMatatuId(matatuId: Int): MatatuFares?
 
     @Query("SELECT * FROM matatu_fares")
     suspend fun getAllFares(): List<MatatuFares>
@@ -18,5 +18,5 @@ interface FareDao {
     suspend fun deleteFare(fare: MatatuFares)
     
     @Query("DELETE FROM matatu_fares WHERE matatuId = :matatuId")
-    suspend fun deleteFareByMatatuId(matatuId: String)
+    suspend fun deleteFareByMatatuId(matatuId: Int)
 }

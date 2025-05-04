@@ -36,7 +36,7 @@ class FareDisplayActivity : ComponentActivity() {
 @Composable
 fun FareDisplayScreen(matatuId: String) {
     val context = LocalContext.current
-    var fareDetails by remember { mutableStateOf<MatatuFares?>(null) } // Updated to MatatuFares
+    var fareDetails by remember { mutableStateOf<List<MatatuFares>?>(null) } 
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -53,19 +53,25 @@ fun FareDisplayScreen(matatuId: String) {
         faresRef.child(matatuId).get().addOnSuccessListener { snapshot ->
             val fetchedFares = if (snapshot.exists()) {
                 try {
-                    val peakFare = snapshot.child("peakFare").getValue(Double::class.java) ?: 0.0
-                    val nonPeakFare = snapshot.child("nonPeakFare").getValue(Double::class.java) ?: 0.0
-                    val rainyPeakFare = snapshot.child("rainyPeakFare").getValue(Double::class.java) ?: 0.0
-                    val rainyNonPeakFare = snapshot.child("rainyNonPeakFare").getValue(Double::class.java) ?: 0.0
-                    val disabilityDiscount = snapshot.child("disabilityDiscount").getValue(Double::class.java) ?: 0.0
-                    
-                    MatatuFares(
-                        peakFare = peakFare,
-                        nonPeakFare = nonPeakFare,
-                        rainyPeakFare = rainyPeakFare,
-                        rainyNonPeakFare = rainyNonPeakFare,
-                        disabilityDiscount = disabilityDiscount
-                    )
+                    val fares = mutableListOf<MatatuFares>()
+                    snapshot.children.forEach { child ->
+                        val matatuId = child.child("matatuId").getValue(String::class.java) ?: ""
+                        val peakFare = child.child("peakFare").getValue(Double::class.java) ?: 0.0
+                        val nonPeakFare = child.child("nonPeakFare").getValue(Double::class.java) ?: 0.0
+                        val rainyPeakFare = child.child("rainyPeakFare").getValue(Double::class.java) ?: 0.0
+                        val rainyNonPeakFare = child.child("rainyNonPeakFare").getValue(Double::class.java) ?: 0.0
+                        val disabilityDiscount = child.child("disabilityDiscount").getValue(Double::class.java) ?: 0.0
+                        val matatuIdInt = matatuId.toIntOrNull() ?: 0
+                        fares.add(MatatuFares(
+                            matatuId = matatuIdInt,
+                            peakFare = peakFare,
+                            nonPeakFare = nonPeakFare,
+                            rainyPeakFare = rainyPeakFare,
+                            rainyNonPeakFare = rainyNonPeakFare,
+                            disabilityDiscount = disabilityDiscount
+                        ))
+                    }
+                    fares
                 } catch (e: Exception) {
                     Log.e("FareDisplayScreen", "Error parsing fare data", e)
                     null
@@ -108,18 +114,30 @@ fun FareDisplayScreen(matatuId: String) {
             Text(text = errorMessage!!, color = Color.Red, fontSize = 16.sp)
         } else {
             fareDetails?.let { fares ->
-                FareDetailItem(label = "Peak Fare:", value = fares.peakFare)
-                FareDetailItem(label = "Non-Peak Fare:", value = fares.nonPeakFare)
-                FareDetailItem(label = "Rainy Peak Fare:", value = fares.rainyPeakFare)
-                FareDetailItem(label = "Rainy Non-Peak Fare:", value = fares.rainyNonPeakFare)
-                FareDetailItem(label = "Disability Discount:", value = fares.disabilityDiscount)
+                fares.forEach { fare ->
+                    if (fare.peakFare > 0.0) {
+                        FareDetailItem(label = "Peak Fare", value = fare.peakFare, isDisabled = false)
+                    }
+                    if (fare.nonPeakFare > 0.0) {
+                        FareDetailItem(label = "Non-Peak Fare", value = fare.nonPeakFare, isDisabled = false)
+                    }
+                    if (fare.rainyPeakFare > 0.0) {
+                        FareDetailItem(label = "Rainy Peak Fare", value = fare.rainyPeakFare, isDisabled = false)
+                    }
+                    if (fare.rainyNonPeakFare > 0.0) {
+                        FareDetailItem(label = "Rainy Non-Peak Fare", value = fare.rainyNonPeakFare, isDisabled = false)
+                    }
+                    if (fare.disabilityDiscount > 0.0) {
+                        FareDetailItem(label = "Disability Discount", value = fare.disabilityDiscount, isDisabled = true)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun FareDetailItem(label: String, value: Double) {
+fun FareDetailItem(label: String, value: Double, isDisabled: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -127,6 +145,10 @@ fun FareDetailItem(label: String, value: Double) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(text = label, fontSize = 18.sp, color = Color.Gray)
-        Text(text = "Ksh ${"%.2f".format(value)}", fontSize = 18.sp, color = Color.Black)
+        Text(
+            text = if (isDisabled) "Ksh ${"%.2f".format(value)} (Disabled)" else "Ksh ${"%.2f".format(value)}",
+            fontSize = 18.sp,
+            color = Color.Black
+        )
     }
 }
