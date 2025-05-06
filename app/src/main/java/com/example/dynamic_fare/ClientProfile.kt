@@ -183,7 +183,8 @@ fun ClientProfileScreen(navController: NavController, userId: String) {
                 coroutineScope.launch {
                     UserSessionDataStore.clearUserEmail(context)
                     navController.navigate("login") {
-                        popUpTo("clientHome") { inclusive = true }
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             },

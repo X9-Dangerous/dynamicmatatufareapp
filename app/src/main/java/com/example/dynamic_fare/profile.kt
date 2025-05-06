@@ -129,7 +129,8 @@ fun ProfileScreen(navController: NavController, userId: String) {
                                 coroutineScope.launch {
                                     UserSessionDataStore.clearUserEmail(context)
                                     navController.navigate(Routes.LoginScreenContent) {
-                                        popUpTo(0)
+                                        popUpTo(0) { inclusive = true }
+                                        launchSingleTop = true
                                     }
                                 }
                             },

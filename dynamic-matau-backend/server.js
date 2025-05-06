@@ -56,8 +56,35 @@ app.post("/stkpush", async (req, res) => {
   }
 });
 
+// MPesa IP Whitelist
+const MPESA_WHITELISTED_IPS = [
+  "196.201.214.200",
+  "196.201.214.206",
+  "196.201.213.114",
+  "196.201.214.207",
+  "196.201.214.208",
+  "196.201.213.44",
+  "196.201.212.127",
+  "196.201.212.138",
+  "196.201.212.129",
+  "196.201.212.136",
+  "196.201.212.74",
+  "196.201.212.69"
+];
+
 // M-Pesa Callback Endpoint
 app.post("/mpesa-callback", async (req, res) => {
+  // Get sender IP (handle proxies and IPv6)
+  const senderIpRaw = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+  const senderIp = Array.isArray(senderIpRaw) ? senderIpRaw[0] : (senderIpRaw || "").replace(/^.*:/, ""); // IPv4 only
+
+  if (!MPESA_WHITELISTED_IPS.includes(senderIp)) {
+    console.warn("Rejected callback from non-whitelisted IP:", senderIp);
+    return res.status(403).json({
+      ResultCode: 1,
+      ResultDesc: "Forbidden: IP not allowed"
+    });
+  }
   try {
     console.log("Received M-Pesa callback:", JSON.stringify(req.body, null, 2));
 

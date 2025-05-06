@@ -194,18 +194,7 @@ fun LoginScreenContent(navController: NavController) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 🔹 Forgot Password
-        Text(
-            text = "Forgot password?",
-            fontSize = 14.sp,
-            color = Color.Blue,
-            modifier = Modifier.clickable {
-                navController.navigate(Routes.PasswordRecoveryScreen)
-            }
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
+        
         // 🔹 Sign-up Navigation
         Row {
             Text(text = "Don't have an account?", fontSize = 14.sp, color = Color.Black)
